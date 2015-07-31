@@ -26,6 +26,7 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.models.utils.DefaultAuthenticationFlows;
 import org.keycloak.models.utils.KeycloakModelUtils;
+import org.keycloak.protocol.RestartLoginCookie;
 import org.keycloak.protocol.oidc.utils.RedirectUtils;
 import org.keycloak.saml.common.constants.GeneralConstants;
 import org.keycloak.saml.common.constants.JBossSAMLURIConstants;
@@ -339,6 +340,7 @@ public class SamlService {
                 if (relayState != null) userSession.setNote(SamlProtocol.SAML_LOGOUT_RELAY_STATE, relayState);
                 userSession.setNote(SamlProtocol.SAML_LOGOUT_REQUEST_ID, logoutRequest.getID());
                 userSession.setNote(SamlProtocol.SAML_LOGOUT_BINDING, logoutBinding);
+                userSession.setNote(SamlProtocol.SAML_LOGOUT_CANONICALIZATION, client.getAttribute(SamlProtocol.SAML_CANONICALIZATION_METHOD_ATTRIBUTE));
                 userSession.setNote(AuthenticationManager.KEYCLOAK_LOGOUT_PROTOCOL, SamlProtocol.LOGIN_PROTOCOL);
                 // remove client from logout requests
                 for (ClientSessionModel clientSession : userSession.getClientSessions()) {
@@ -513,6 +515,7 @@ public class SamlService {
                 .setRequest(request);
 
         try {
+            RestartLoginCookie.setRestartCookie(realm, clientConnection, uriInfo, clientSession);
             return processor.authenticate();
         } catch (Exception e) {
             return processor.handleBrowserException(e);

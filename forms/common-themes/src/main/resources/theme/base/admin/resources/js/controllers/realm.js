@@ -7,9 +7,6 @@ module.controller('GlobalCtrl', function($scope, $http, Auth, WhoAmI, Current, $
     $scope.resourceUrl = resourceUrl;
     $scope.auth = Auth;
     $scope.serverInfo = ServerInfo.get();
-    $scope.serverInfoUpdate = function() {
-        $scope.serverInfo = ServerInfo.get();
-    };
 
     function hasAnyAccess() {
         var realmAccess = Auth.user && Auth.user['realm_access'];
@@ -123,6 +120,25 @@ module.controller('RealmTabCtrl', function(Dialog, $scope, Current, Realm, Notif
             });
         });
     };
+});
+
+module.controller('ServerInfoCtrl', function($scope, ServerInfo) {
+    ServerInfo.reload();
+
+    $scope.serverInfo = ServerInfo.get();
+
+    $scope.$watch($scope.serverInfo, function() {
+        $scope.providers = [];
+        for(var spi in $scope.serverInfo.providers) {
+            var p = angular.copy($scope.serverInfo.providers[spi]);
+            p.name = spi;
+            $scope.providers.push(p)
+        }
+    });
+
+    $scope.serverInfoReload = function() {
+        ServerInfo.reload();
+    }
 });
 
 module.controller('RealmListCtrl', function($scope, Realm, Current) {
@@ -862,6 +878,18 @@ module.controller('RealmIdentityProviderCtrl', function($scope, $filter, $upload
         $scope.hidePassword = flag;
     };
 
+    $scope.removeIdentityProvider = function(identityProvider) {
+        Dialog.confirmDelete(identityProvider.alias, 'provider', function() {
+            IdentityProvider.remove({
+                realm : realm.realm,
+                alias : identityProvider.alias
+            }, function() {
+                $route.reload();
+                Notifications.success("The identity provider has been deleted.");
+            });
+        });
+    };
+
 });
 
 module.controller('RealmIdentityProviderExportCtrl', function(realm, identityProvider, $scope, $http, IdentityProviderExport) {
@@ -1053,16 +1081,21 @@ module.controller('RealmRevocationCtrl', function($scope, Realm, RealmPushRevoca
 });
 
 
-module.controller('RoleListCtrl', function($scope, $location, realm, roles) {
-
+module.controller('RoleListCtrl', function($scope, $route, Dialog, Notifications, realm, roles, RoleById) {
     $scope.realm = realm;
     $scope.roles = roles;
 
-    $scope.$watch(function() {
-        return $location.path();
-    }, function() {
-        $scope.path = $location.path().substring(1).split("/");
-    });
+    $scope.removeRole = function (role) {
+        Dialog.confirmDelete(role.name, 'role', function () {
+            RoleById.remove({
+                realm: realm.realm,
+                role: role.id
+            }, function () {
+                $route.reload();
+                Notifications.success("The role has been deleted.");
+            });
+        });
+    };
 });
 
 
@@ -1201,7 +1234,7 @@ module.controller('RealmEventsConfigCtrl', function($scope, eventsConfig, RealmE
         }
     });
 
-    $scope.eventListeners = serverInfo.eventListeners;
+    $scope.eventListeners = Object.keys(serverInfo.providers.eventsListener.providers);
 
     $scope.eventSelectOptions = {
         'multiple': true,

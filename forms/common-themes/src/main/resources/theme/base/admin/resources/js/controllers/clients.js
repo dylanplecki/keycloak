@@ -310,17 +310,23 @@ module.controller('ClientCertificateExportCtrl', function($scope, $location, $ht
             data: $scope.jks,
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'client/octet-stream'
+                'Accept': 'application/octet-stream'
             }
         }).success(function(data){
             var blob = new Blob([data], {
-                type: 'client/octet-stream'
+                type: 'application/octet-stream'
             });
             var ext = ".jks";
             if ($scope.jks.format == 'PKCS12') ext = ".p12";
             saveAs(blob, 'keystore' + ext);
-        }).error(function(){
-            Notifications.error("Error downloading.");
+        }).error(function(data) {
+            var errorMsg = 'Error downloading';
+            try {
+                var error = JSON.parse(String.fromCharCode.apply(null, new Uint8Array(data)));
+                errorMsg = error['error_description'] ? error['error_description'] : errorMsg;
+            } catch (err) {
+            }
+            Notifications.error(errorMsg);
         });
     }
 
@@ -483,15 +489,22 @@ module.controller('ClientImportCtrl', function($scope, $location, $upload, realm
 });
 
 
-module.controller('ClientListCtrl', function($scope, realm, clients, Client, serverInfo, $location) {
+module.controller('ClientListCtrl', function($scope, realm, clients, Client, serverInfo, $route, Dialog, Notifications) {
     $scope.realm = realm;
     $scope.clients = clients;
     $scope.importButton = serverInfo.clientImporters.length > 0;
-    $scope.$watch(function() {
-        return $location.path();
-    }, function() {
-        $scope.path = $location.path().substring(1).split("/");
-    });
+
+    $scope.removeClient = function(client) {
+        Dialog.confirmDelete(client.clientId, 'client', function() {
+            Client.remove({
+                realm : realm.realm,
+                client : client.id
+            }, function() {
+                $route.reload();
+                Notifications.success("The client has been deleted.");
+            });
+        });
+    };
 });
 
 module.controller('ClientInstallationCtrl', function($scope, realm, client, ClientInstallation,ClientInstallationJBoss, $http, $routeParams) {
@@ -542,7 +555,7 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, $route, se
         "bearer-only"
     ];
 
-    $scope.protocols = serverInfo.protocols;
+    $scope.protocols = Object.keys(serverInfo.providers['login-protocol'].providers).sort();
 
     $scope.signatureAlgorithms = [
         "RSA_SHA1",
@@ -555,6 +568,13 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, $route, se
         "email",
         "transient",
         "persistent"
+    ];
+
+    $scope.canonicalization = [
+        {name: "EXCLUSIVE", value:  "http://www.w3.org/2001/10/xml-exc-c14n#"  },
+        {name: "EXCLUSIVE_WITH_COMMENTS", value: "http://www.w3.org/2001/10/xml-exc-c14n#WithComments"},
+        {name: "INCLUSIVE", value: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315" },
+        {name: "INCLUSIVE_WITH_COMMENTS", value: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments"}
     ];
 
     $scope.realm = realm;
@@ -601,9 +621,9 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, $route, se
         } else if (client.attributes['saml_name_id_format'] == 'persistent') {
             $scope.nameIdFormat = $scope.nameIdFormats[3];
         }
-
     } else {
         $scope.client = { enabled: true, attributes: {}};
+        $scope.client.attributes['saml_signature_canonicalization_method'] = $scope.canonicalization[0].value;
         $scope.client.redirectUris = [];
         $scope.accessType = $scope.accessTypes[0];
         $scope.protocol = $scope.protocols[0];
@@ -1003,7 +1023,7 @@ module.controller('ClientRevocationCtrl', function($scope, realm, client, Client
 
 });
 
-module.controller('ClientClusteringCtrl', function($scope, client, Client, ClientTestNodesAvailable, realm, $location, $route, Notifications, TimeUnit) {
+module.controller('ClientClusteringCtrl', function($scope, client, Client, ClientTestNodesAvailable, ClientClusterNode, realm, $location, $route, Dialog, Notifications, TimeUnit) {
     $scope.client = client;
     $scope.realm = realm;
 
@@ -1065,6 +1085,15 @@ module.controller('ClientClusteringCtrl', function($scope, client, Client, Clien
         }
 
         $scope.nodeRegistrations = nodeRegistrations;
+    };
+
+    $scope.removeNode = function(node) {
+        Dialog.confirmDelete(node.host, 'node', function() {
+            ClientClusterNode.remove({ realm : realm.realm, client : client.id , node: node.host }, function() {
+                Notifications.success('Node ' + node.host + ' unregistered successfully.');
+                $route.reload();
+            });
+        });
     };
 });
 
@@ -1172,8 +1201,8 @@ module.controller('AddBuiltinProtocolMapperCtrl', function($scope, realm, client
 });
 
 module.controller('ClientProtocolMapperListCtrl', function($scope, realm, client, serverInfo,
-                                                           ClientProtocolMappersByProtocol,
-                                                           $http, $location, Dialog, Notifications) {
+                                                           ClientProtocolMappersByProtocol, ClientProtocolMapper,
+                                                           $route, Dialog, Notifications) {
     $scope.realm = realm;
     $scope.client = client;
     if (client.protocol == null) {
@@ -1187,6 +1216,15 @@ module.controller('ClientProtocolMapperListCtrl', function($scope, realm, client
     }
     $scope.mapperTypes = mapperTypes;
 
+    $scope.removeMapper = function(mapper) {
+        console.debug(mapper);
+        Dialog.confirmDelete(mapper.name, 'mapper', function() {
+            ClientProtocolMapper.remove({ realm: realm.realm, client: client.id, id : mapper.id }, function() {
+                Notifications.success("The mapper has been deleted.");
+                $route.reload();
+            });
+        });
+    };
 
     var updateMappers = function() {
         $scope.mappers = ClientProtocolMappersByProtocol.query({realm : realm.realm, client : client.id, protocol : client.protocol});
@@ -1297,26 +1335,6 @@ module.controller('ClientProtocolMapperCreateCtrl', function($scope, realm, serv
 
 
 });
-
-module.controller('ClientServiceAccountsCtrl', function($scope, $http, realm, client, Notifications, Client) {
-    $scope.realm = realm;
-    $scope.client = angular.copy(client);
-
-    $scope.serviceAccountsEnabledChanged = function() {
-        if (client.serviceAccountsEnabled != $scope.client.serviceAccountsEnabled) {
-            Client.update({
-                realm : realm.realm,
-                client : client.id
-            }, $scope.client, function() {
-                $scope.changed = false;
-                client = angular.copy($scope.client);
-                Notifications.success("Service Account settings updated.");
-            });
-        }
-    }
-
-});
-
 
 
 

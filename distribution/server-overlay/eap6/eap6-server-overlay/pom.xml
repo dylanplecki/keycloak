@@ -4,7 +4,7 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.4.0.Final-SNAPSHOT</version>
+        <version>1.5.0.Final-SNAPSHOT</version>
         <relativePath>../../../../pom.xml</relativePath>
     </parent>
 
@@ -66,6 +66,25 @@
                                     <stylesheet>src/main/xslt/standalone.xsl</stylesheet>
                                     <includes>
                                         <include>standalone.xml</include>
+                                    </includes>
+                                    <outputDir>${project.build.directory}</outputDir>
+                                </transformationSet>
+                            </transformationSets>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-resources-2</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>transform</goal>
+                        </goals>
+                        <configuration>
+                            <transformationSets>
+                                <transformationSet>
+                                    <dir>src/main</dir>
+                                    <stylesheet>src/main/xslt/standalone-ha.xsl</stylesheet>
+                                    <includes>
+                                        <include>standalone-ha.xml</include>
                                     </includes>
                                     <outputDir>${project.build.directory}</outputDir>
                                 </transformationSet>

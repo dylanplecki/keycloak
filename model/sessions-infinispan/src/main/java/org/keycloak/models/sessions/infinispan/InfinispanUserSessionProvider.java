@@ -2,6 +2,7 @@ package org.keycloak.models.sessions.infinispan;
 
 import org.infinispan.Cache;
 import org.infinispan.distexec.mapreduce.MapReduceTask;
+import org.jboss.logging.Logger;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientSessionModel;
 import org.keycloak.models.KeycloakSession;
@@ -20,6 +21,7 @@ import org.keycloak.models.sessions.infinispan.mapreduce.ClientSessionMapper;
 import org.keycloak.models.sessions.infinispan.mapreduce.FirstResultReducer;
 import org.keycloak.models.sessions.infinispan.mapreduce.LargestResultReducer;
 import org.keycloak.models.sessions.infinispan.mapreduce.SessionMapper;
+import org.keycloak.models.sessions.infinispan.mapreduce.UserLoginFailureMapper;
 import org.keycloak.models.sessions.infinispan.mapreduce.UserSessionMapper;
 import org.keycloak.models.sessions.infinispan.mapreduce.UserSessionNoteMapper;
 import org.keycloak.models.utils.KeycloakModelUtils;
@@ -39,6 +41,8 @@ import java.util.Map;
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
  */
 public class InfinispanUserSessionProvider implements UserSessionProvider {
+
+    private static final Logger log = Logger.getLogger(InfinispanUserSessionProvider.class);
 
     private final KeycloakSession session;
     private final Cache<String, SessionEntity> sessionCache;
@@ -294,8 +298,29 @@ public class InfinispanUserSessionProvider implements UserSessionProvider {
     }
 
     @Override
+    public void removeUserLoginFailure(RealmModel realm, String username) {
+        LoginFailureKey key = new LoginFailureKey(realm.getId(), username);
+        tx.remove(loginFailureCache, key);
+    }
+
+    @Override
+    public void removeAllUserLoginFailures(RealmModel realm) {
+        Map<LoginFailureKey, Object> sessions = new MapReduceTask(loginFailureCache)
+                .mappedWith(UserLoginFailureMapper.create(realm.getId()).emitKey())
+                .reducedWith(new FirstResultReducer())
+                .execute();
+
+        for (LoginFailureKey id : sessions.keySet()) {
+            tx.remove(loginFailureCache, id);
+        }
+    }
+
+
+
+    @Override
     public void onRealmRemoved(RealmModel realm) {
         removeUserSessions(realm);
+        removeAllUserLoginFailures(realm);
     }
 
     @Override
@@ -451,6 +476,8 @@ public class InfinispanUserSessionProvider implements UserSessionProvider {
         }
 
         public void put(Cache cache, Object key, Object value) {
+            log.tracev("Adding cache operation: {0} on {1}", CacheOperation.ADD, key);
+
             if (tasks.containsKey(key)) {
                 throw new IllegalStateException("Can't add session: task in progress for session");
             } else {
@@ -459,6 +486,8 @@ public class InfinispanUserSessionProvider implements UserSessionProvider {
         }
 
         public void replace(Cache cache, Object key, Object value) {
+            log.tracev("Adding cache operation: {0} on {1}", CacheOperation.REPLACE, key);
+
             CacheTask current = tasks.get(key);
             if (current != null) {
                 switch (current.operation) {
@@ -467,14 +496,16 @@ public class InfinispanUserSessionProvider implements UserSessionProvider {
                         current.value = value;
                         return;
                     case REMOVE:
-                        throw new IllegalStateException("Can't remove session: task in progress for session");
+                        return;
                 }
             } else {
                 tasks.put(key, new CacheTask(cache, CacheOperation.REPLACE, key, value));
             }
         }
 
-        public void remove(Cache cache, String key) {
+        public void remove(Cache cache, Object key) {
+            log.tracev("Adding cache operation: {0} on {1}", CacheOperation.REMOVE, key);
+
             tasks.put(key, new CacheTask(cache, CacheOperation.REMOVE, key, null));
         }
 
@@ -492,6 +523,8 @@ public class InfinispanUserSessionProvider implements UserSessionProvider {
             }
 
             public void execute() {
+                log.tracev("Executing cache operation: {0} on {1}", operation, key);
+
                 switch (operation) {
                     case ADD:
                         cache.put(key, value);

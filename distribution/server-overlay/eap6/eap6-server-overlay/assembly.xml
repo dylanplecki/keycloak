@@ -29,7 +29,12 @@
             <destName>standalone-keycloak.xml</destName>
         </file>
         <file>
-            <source>src/main/keycloak-server.json</source>
+            <source>${project.build.directory}/standalone-ha.xml</source>
+            <outputDirectory>standalone/configuration</outputDirectory>
+            <destName>standalone-keycloak-ha.xml</destName>
+        </file>
+        <file>
+            <source>../../../feature-packs/server-feature-pack/src/main/resources/content/standalone/configuration/keycloak-server.json</source>
             <outputDirectory>standalone/configuration</outputDirectory>
         </file>
         <file>
