@@ -1,7 +1,7 @@
 package org.keycloak.authentication;
 
 import org.jboss.resteasy.spi.HttpRequest;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.login.LoginFormsProvider;
 import org.keycloak.models.ClientSessionModel;
@@ -86,7 +86,7 @@ public interface RequiredActionContext {
      *
      * @return
      */
-    String generateAccessCode(String action);
+    String generateCode();
 
     Status getStatus();
 

@@ -1,6 +1,7 @@
 package org.keycloak.testsuite.rule;
 
 import io.undertow.servlet.api.DeploymentInfo;
+import io.undertow.servlet.api.FilterInfo;
 import io.undertow.servlet.api.LoginConfig;
 import io.undertow.servlet.api.SecurityConstraint;
 import io.undertow.servlet.api.SecurityInfo;
@@ -11,6 +12,7 @@ import org.junit.rules.ExternalResource;
 import org.junit.rules.TemporaryFolder;
 import org.keycloak.Config;
 import org.keycloak.adapters.KeycloakConfigResolver;
+import org.keycloak.adapters.servlet.KeycloakOIDCFilter;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakTransaction;
 import org.keycloak.models.RealmModel;
@@ -22,8 +24,9 @@ import org.keycloak.services.managers.RealmManager;
 import org.keycloak.testsuite.Retry;
 import org.keycloak.testsuite.KeycloakServer;
 import org.keycloak.util.JsonSerialization;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Time;
 
+import javax.servlet.DispatcherType;
 import javax.servlet.Servlet;
 import javax.ws.rs.core.Application;
 import java.io.ByteArrayOutputStream;
@@ -348,6 +351,22 @@ public abstract class AbstractKeycloakRule extends ExternalResource {
             addErrorPage(di);
 
             server.getServer().deploy(di);
+        }
+
+        public void deployApplicationWithFilter() {
+            DeploymentInfo di = createDeploymentInfo(name, contextPath, servletClass);
+            FilterInfo filter = new FilterInfo("keycloak-filter", KeycloakOIDCFilter.class);
+            if (null == keycloakConfigResolver) {
+                filter.addInitParam("keycloak.config.file", adapterConfigPath);
+            } else {
+                filter.addInitParam("keycloak.config.resolver", keycloakConfigResolver.getCanonicalName());
+            }
+            di.addFilter(filter);
+            di.addFilterUrlMapping("keycloak-filter", constraintUrl, DispatcherType.REQUEST);
+            server.getServer().deploy(di);
+
+
+
         }
 
     }

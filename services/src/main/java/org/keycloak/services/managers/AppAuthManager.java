@@ -2,7 +2,8 @@ package org.keycloak.services.managers;
 
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.spi.UnauthorizedException;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
+import org.keycloak.models.KeycloakContext;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 
@@ -39,10 +40,15 @@ public class AppAuthManager extends AuthenticationManager {
         return tokenString;
     }
 
+    public AuthResult authenticateBearerToken(KeycloakSession session, RealmModel realm) {
+        KeycloakContext ctx = session.getContext();
+        return authenticateBearerToken(session, realm, ctx.getUri(), ctx.getConnection(), ctx.getRequestHeaders());
+    }
+
     public AuthResult authenticateBearerToken(KeycloakSession session, RealmModel realm, UriInfo uriInfo, ClientConnection connection, HttpHeaders headers) {
         String tokenString = extractAuthorizationHeaderToken(headers);
         if (tokenString == null) return null;
-        AuthResult authResult = verifyIdentityToken(session, realm, uriInfo, connection, true, tokenString, headers);
+        AuthResult authResult = verifyIdentityToken(session, realm, uriInfo, connection, true, true, tokenString, headers);
         return authResult;
     }
 

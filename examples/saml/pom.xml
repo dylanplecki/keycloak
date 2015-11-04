@@ -3,7 +3,7 @@
     <parent>
         <artifactId>keycloak-examples-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
     </parent>
 
     <name>Provider Examples</name>
@@ -25,10 +25,8 @@
         </plugins>
     </build>
     <modules>
-        <module>post-basic</module>
         <module>post-with-signature</module>
         <module>post-with-encryption</module>
-        <module>redirect-basic</module>
         <module>redirect-with-signature</module>
     </modules>
 </project>

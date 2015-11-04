@@ -208,12 +208,23 @@ module.controller('UserConsentsCtrl', function($scope, realm, user, userConsents
             UserConsents.query({realm: realm.realm, user: user.id}, function(updated) {
                 $scope.userConsents = updated;
             })
-            Notifications.success('Consent revoked successfully');
+            Notifications.success('Grant revoked successfully');
         }, function() {
-            Notifications.error("Consent couldn't be revoked");
+            Notifications.error("Grant couldn't be revoked");
         });
         console.log("Revoke consent " + clientId);
     }
+});
+
+module.controller('UserOfflineSessionsCtrl', function($scope, $location, realm, user, client, offlineSessions) {
+    $scope.realm = realm;
+    $scope.user = user;
+    $scope.client = client;
+    $scope.offlineSessions = offlineSessions;
+
+    $scope.cancel = function() {
+         $location.url("/realms/" + realm.realm + '/users/' + user.id + '/consents');
+    };
 });
 
 

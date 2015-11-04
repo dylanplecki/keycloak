@@ -4,7 +4,7 @@
 	<parent>
 		<artifactId>keycloak-parent</artifactId>
 		<groupId>org.keycloak</groupId>
-		<version>1.5.0.Final-SNAPSHOT</version>
+		<version>1.7.0.Final-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
@@ -69,9 +69,7 @@
         <module>tomcat6</module>
         <module>tomcat7</module>
         <module>tomcat8</module>
-        <module>jetty/jetty81</module>
-        <module>jetty/jetty92</module>
-        <module>jetty/jetty91</module>
+        <module>jetty</module>
         <module>performance</module>
         <!--<module>docker-cluster</module>-->
     </modules>

@@ -5,14 +5,14 @@ import java.security.PrivilegedExceptionAction;
 
 import javax.security.auth.Subject;
 
-import net.iharder.Base64;
+import org.keycloak.common.util.Base64;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
 import org.jboss.logging.Logger;
 import org.keycloak.federation.kerberos.CommonKerberosConfig;
-import org.keycloak.util.KerberosSerializationUtils;
+import org.keycloak.common.util.KerberosSerializationUtils;
 
 /**
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
@@ -106,6 +106,11 @@ public class SPNEGOAuthenticator {
                 logAuthDetails(gssContext);
 
                 if (gssContext.isEstablished()) {
+                    if (gssContext.getSrcName() == null) {
+                        log.warn("GSS Context accepted, but no context initiator recognized. Check your kerberos configuration and reverse DNS lookup configuration");
+                        return false;
+                    }
+
                     authenticatedKerberosPrincipal = gssContext.getSrcName().toString();
 
                     if (gssContext.getCredDelegState()) {

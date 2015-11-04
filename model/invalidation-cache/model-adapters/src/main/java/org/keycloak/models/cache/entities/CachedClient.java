@@ -21,14 +21,15 @@ import java.util.TreeMap;
  * @version $Revision: 1 $
  */
 public class CachedClient implements Serializable {
-    private static final long serialVersionUID = 1L;
 
     private String id;
     private String clientId;
     private String name;
+    private String description;
     private String realm;
     private Set<String> redirectUris = new HashSet<String>();
     private boolean enabled;
+    private String clientAuthenticatorType;
     private String secret;
     private String protocol;
     private Map<String, String> attributes = new HashMap<String, String>();
@@ -42,6 +43,7 @@ public class CachedClient implements Serializable {
     private Set<ProtocolMapperModel> protocolMappers = new HashSet<ProtocolMapperModel>();
     private boolean surrogateAuthRequired;
     private String managementUrl;
+    private String rootUrl;
     private String baseUrl;
     private List<String> defaultRoles = new LinkedList<String>();
     private boolean bearerOnly;
@@ -53,9 +55,11 @@ public class CachedClient implements Serializable {
 
     public CachedClient(RealmCache cache, RealmProvider delegate, RealmModel realm, ClientModel model) {
         id = model.getId();
+        clientAuthenticatorType = model.getClientAuthenticatorType();
         secret = model.getSecret();
         clientId = model.getClientId();
         name = model.getName();
+        description = model.getDescription();
         this.realm = realm.getId();
         enabled = model.isEnabled();
         protocol = model.getProtocol();
@@ -75,6 +79,7 @@ public class CachedClient implements Serializable {
         }
         surrogateAuthRequired = model.isSurrogateAuthRequired();
         managementUrl = model.getManagementUrl();
+        rootUrl = model.getRootUrl();
         baseUrl = model.getBaseUrl();
         defaultRoles.addAll(model.getDefaultRoles());
         bearerOnly = model.isBearerOnly();
@@ -100,6 +105,10 @@ public class CachedClient implements Serializable {
         return name;
     }
 
+    public String getDescription() { return description; }
+
+    public void setDescription(String description) { this.description = description; }
+
     public String getRealm() {
         return realm;
     }
@@ -110,6 +119,10 @@ public class CachedClient implements Serializable {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public String getClientAuthenticatorType() {
+        return clientAuthenticatorType;
     }
 
     public String getSecret() {
@@ -162,6 +175,10 @@ public class CachedClient implements Serializable {
 
     public String getManagementUrl() {
         return managementUrl;
+    }
+
+    public String getRootUrl() {
+        return rootUrl;
     }
 
     public String getBaseUrl() {

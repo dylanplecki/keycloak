@@ -4,7 +4,7 @@
     <parent>
 		<artifactId>keycloak-parent</artifactId>
 		<groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
 		<relativePath>../../../pom.xml</relativePath>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
@@ -12,7 +12,7 @@
 	<artifactId>keycloak-jetty81-adapter</artifactId>
 	<name>Keycloak Jetty 8.1.x Integration</name>
     <properties>
-        <jetty9.version>8.1.16.v20140903</jetty9.version>
+        <jetty9.version>8.1.17.v20150415</jetty9.version>
         <keycloak.osgi.export>
             org.keycloak.adapters.jetty.*
         </keycloak.osgi.export>
@@ -40,15 +40,15 @@
         </dependency>
         <dependency>
             <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-adapter-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
             <artifactId>keycloak-jetty-core</artifactId>
         </dependency>
 		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>net.iharder</groupId>
-			<artifactId>base64</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.bouncycastle</groupId>

@@ -1,8 +1,25 @@
+/*
+ * Copyright 2015 Red Hat Inc. and/or its affiliates and other contributors
+ * as indicated by the @author tags. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.keycloak.services.managers;
 
 import org.jboss.logging.Logger;
 import org.keycloak.Config;
-import org.keycloak.enums.SslRequired;
+import org.keycloak.common.enums.SslRequired;
+import org.keycloak.models.session.UserSessionPersisterProvider;
 import org.keycloak.models.utils.RealmImporter;
 import org.keycloak.models.AccountRoles;
 import org.keycloak.models.AdminRoles;
@@ -27,11 +44,14 @@ import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.OAuthClientRepresentation;
 import org.keycloak.representations.idm.RealmEventsConfigRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.timer.TimerProvider;
 
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import org.keycloak.models.ProtocolMapperModel;
+import org.keycloak.protocol.ProtocolMapperUtils;
 
 /**
  * Per request object
@@ -95,6 +115,7 @@ public class RealmManager implements RealmImporter {
         setupImpersonationService(realm);
         setupAuthenticationFlows(realm);
         setupRequiredActions(realm);
+        setupOfflineTokens(realm);
 
         return realm;
     }
@@ -107,6 +128,10 @@ public class RealmManager implements RealmImporter {
         if (realm.getRequiredActionProviders().size() == 0) DefaultRequiredActions.addActions(realm);
     }
 
+    protected void setupOfflineTokens(RealmModel realm) {
+        KeycloakModelUtils.setupOfflineTokens(realm);
+    }
+
     protected void setupAdminConsole(RealmModel realm) {
         ClientModel adminConsole = realm.getClientByClientId(Constants.ADMIN_CONSOLE_CLIENT_ID);
         if (adminConsole == null) adminConsole = new ClientManager(this).createClient(realm, Constants.ADMIN_CONSOLE_CLIENT_ID);
@@ -117,6 +142,9 @@ public class RealmManager implements RealmImporter {
         adminConsole.setPublicClient(true);
         adminConsole.addRedirectUri(baseUrl + "/*");
         adminConsole.setFullScopeAllowed(false);
+
+        ProtocolMapperModel localeMapper = ProtocolMapperUtils.findLocaleMapper(session);
+        if (localeMapper != null) adminConsole.addProtocolMapper(localeMapper);
 
         RoleModel adminRole;
         if (realm.getName().equals(Config.getAdminRealm())) {
@@ -170,6 +198,11 @@ public class RealmManager implements RealmImporter {
                 sessions.onRealmRemoved(realm);
             }
 
+            UserSessionPersisterProvider sessionsPersister = session.getProvider(UserSessionPersisterProvider.class);
+            if (sessionsPersister != null) {
+                sessionsPersister.onRealmRemoved(realm);
+            }
+
             // Remove all periodic syncs for configured federation providers
             UsersSyncManager usersSyncManager = new UsersSyncManager();
             for (final UserFederationProviderModel fedProvider : federationProviders) {
@@ -183,12 +216,12 @@ public class RealmManager implements RealmImporter {
         realm.setEventsEnabled(rep.isEventsEnabled());
         realm.setEventsExpiration(rep.getEventsExpiration() != null ? rep.getEventsExpiration() : 0);
         if (rep.getEventsListeners() != null) {
-            realm.setEventsListeners(new HashSet<String>(rep.getEventsListeners()));
+            realm.setEventsListeners(new HashSet<>(rep.getEventsListeners()));
         }
         if(rep.getEnabledEventTypes() != null) {
-            realm.setEnabledEventTypes(new HashSet<String>(rep.getEnabledEventTypes()));
+            realm.setEnabledEventTypes(new HashSet<>(rep.getEnabledEventTypes()));
         }
-        
+
         realm.setAdminEventsEnabled(rep.isAdminEventsEnabled());
         realm.setAdminEventsDetailsEnabled(rep.isAdminEventsDetailsEnabled());
     }
@@ -216,12 +249,14 @@ public class RealmManager implements RealmImporter {
 
             RoleModel createRealmRole = realm.addRole(AdminRoles.CREATE_REALM);
             adminRole.addCompositeRole(createRealmRole);
-            createRealmRole.setDescription("${role_"+AdminRoles.CREATE_REALM+"}");
+            createRealmRole.setDescription("${role_" + AdminRoles.CREATE_REALM + "}");
+            createRealmRole.setScopeParamRequired(false);
         } else {
             adminRealm = model.getRealmByName(Config.getAdminRealm());
             adminRole = adminRealm.getRole(AdminRoles.ADMIN);
         }
         adminRole.setDescription("${role_"+AdminRoles.ADMIN+"}");
+        adminRole.setScopeParamRequired(false);
 
         ClientModel realmAdminApp = KeycloakModelUtils.createClient(adminRealm, KeycloakModelUtils.getMasterRealmAdminApplicationClientId(realm.getName()));
         // No localized name for now
@@ -232,6 +267,7 @@ public class RealmManager implements RealmImporter {
         for (String r : AdminRoles.ALL_REALM_ROLES) {
             RoleModel role = realmAdminApp.addRole(r);
             role.setDescription("${role_"+r+"}");
+            role.setScopeParamRequired(false);
             adminRole.addCompositeRole(role);
         }
     }
@@ -249,12 +285,14 @@ public class RealmManager implements RealmImporter {
         }
         RoleModel adminRole = realmAdminClient.addRole(AdminRoles.REALM_ADMIN);
         adminRole.setDescription("${role_" + AdminRoles.REALM_ADMIN + "}");
+        adminRole.setScopeParamRequired(false);
         realmAdminClient.setBearerOnly(true);
         realmAdminClient.setFullScopeAllowed(false);
 
         for (String r : AdminRoles.ALL_REALM_ROLES) {
             RoleModel role = realmAdminClient.addRole(r);
             role.setDescription("${role_"+r+"}");
+            role.setScopeParamRequired(false);
             adminRole.addCompositeRole(role);
         }
     }
@@ -274,7 +312,9 @@ public class RealmManager implements RealmImporter {
 
             for (String role : AccountRoles.ALL) {
                 client.addDefaultRole(role);
-                client.getRole(role).setDescription("${role_"+role+"}");
+                RoleModel roleModel = client.getRole(role);
+                roleModel.setDescription("${role_" + role + "}");
+                roleModel.setScopeParamRequired(false);
             }
         }
     }
@@ -292,7 +332,9 @@ public class RealmManager implements RealmImporter {
             client.setFullScopeAllowed(false);
 
             for (String role : Constants.BROKER_SERVICE_ROLES) {
-                client.addRole(role).setDescription("${role_"+ role.toLowerCase().replaceAll("_", "-") +"}");
+                RoleModel roleModel = client.addRole(role);
+                roleModel.setDescription("${role_"+ role.toLowerCase().replaceAll("_", "-") +"}");
+                roleModel.setScopeParamRequired(false);
             }
         }
     }
@@ -329,6 +371,7 @@ public class RealmManager implements RealmImporter {
 
         if (!hasBrokerClient(rep)) setupBrokerService(realm);
         if (!hasAdminConsoleClient(rep)) setupAdminConsole(realm);
+        if (!hasRealmRole(rep, Constants.OFFLINE_ACCESS_ROLE)) setupOfflineTokens(realm);
 
         RepresentationToModel.importRealm(session, rep, realm);
 
@@ -337,7 +380,7 @@ public class RealmManager implements RealmImporter {
         }
 
         // Could happen when migrating from older version and I have exported JSON file, which contains "realm-management" client but not "impersonation" client
-        // I need to postpone impersonation because it needs "realm-management" client and it's roles set
+        // I need to postpone impersonation because it needs "realm-management" client and its roles set
         if (postponeImpersonationSetup) {
             setupImpersonationService(realm);
         }
@@ -403,6 +446,20 @@ public class RealmManager implements RealmImporter {
                 if (clientRep.getName().equals(clientId)) {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean hasRealmRole(RealmRepresentation rep, String roleName) {
+        if (rep.getRoles() == null || rep.getRoles().getRealm() == null) {
+            return false;
+        }
+
+        for (RoleRepresentation role : rep.getRoles().getRealm()) {
+            if (roleName.equals(role.getName())) {
+                return true;
             }
         }
 

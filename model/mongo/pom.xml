@@ -5,7 +5,7 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -18,11 +18,6 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15on</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>net.iharder</groupId>
-            <artifactId>base64</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>

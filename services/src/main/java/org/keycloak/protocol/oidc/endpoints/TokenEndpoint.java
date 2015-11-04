@@ -2,12 +2,12 @@ package org.keycloak.protocol.oidc.endpoints;
 
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.spi.HttpRequest;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.OAuthErrorException;
 import org.keycloak.authentication.AuthenticationProcessor;
 import org.keycloak.constants.AdapterConstants;
-import org.keycloak.constants.ServiceAccountConstants;
+import org.keycloak.common.constants.ServiceAccountConstants;
 import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
 import org.keycloak.events.EventBuilder;
@@ -262,11 +262,14 @@ public class TokenEndpoint {
 
         AccessTokenResponse res;
         try {
-            res = tokenManager.refreshAccessToken(session, uriInfo, clientConnection, realm, client, refreshToken, event, headers);
+            TokenManager.RefreshResult result = tokenManager.refreshAccessToken(session, uriInfo, clientConnection, realm, client, refreshToken, event, headers);
+            res = result.getResponse();
 
-            UserSessionModel userSession = session.sessions().getUserSession(realm, res.getSessionState());
-            updateClientSessions(userSession.getClientSessions());
-            updateUserSessionFromClientAuth(userSession);
+            if (!result.isOfflineToken()) {
+                UserSessionModel userSession = session.sessions().getUserSession(realm, res.getSessionState());
+                updateClientSessions(userSession.getClientSessions());
+                updateUserSessionFromClientAuth(userSession);
+            }
 
         } catch (OAuthErrorException e) {
             event.error(Errors.INVALID_TOKEN);
@@ -337,6 +340,8 @@ public class TokenEndpoint {
         clientSession.setAuthMethod(OIDCLoginProtocol.LOGIN_PROTOCOL);
         clientSession.setAction(ClientSessionModel.Action.AUTHENTICATE.name());
         clientSession.setNote(OIDCLoginProtocol.ISSUER, Urls.realmIssuer(uriInfo.getBaseUri(), realm.getName()));
+        clientSession.setNote(OIDCLoginProtocol.SCOPE_PARAM, scope);
+
         AuthenticationFlowModel flow = realm.getDirectGrantFlow();
         String flowId = flow.getId();
         AuthenticationProcessor processor = new AuthenticationProcessor();
@@ -363,7 +368,7 @@ public class TokenEndpoint {
         updateUserSessionFromClientAuth(userSession);
 
         AccessTokenResponse res = tokenManager.responseBuilder(realm, client, event, session, userSession, clientSession)
-                .generateAccessToken(session, scope, client, user, userSession, clientSession)
+                .generateAccessToken()
                 .generateRefreshToken()
                 .generateIDToken()
                 .build();
@@ -394,7 +399,7 @@ public class TokenEndpoint {
 
         if (clientUser == null || client.getProtocolMapperByName(OIDCLoginProtocol.LOGIN_PROTOCOL, ServiceAccountConstants.CLIENT_ID_PROTOCOL_MAPPER) == null) {
             // May need to handle bootstrap here as well
-            logger.infof("Service account user for client '%s' not found or default protocol mapper for service account not found. Creating now", client.getClientId());
+            logger.debugf("Service account user for client '%s' not found or default protocol mapper for service account not found. Creating now", client.getClientId());
             new ClientManager(new RealmManager(session)).enableServiceAccount(client);
             clientUser = session.users().getUserByServiceAccountClient(client);
         }
@@ -415,6 +420,7 @@ public class TokenEndpoint {
         ClientSessionModel clientSession = sessions.createClientSession(realm, client);
         clientSession.setAuthMethod(OIDCLoginProtocol.LOGIN_PROTOCOL);
         clientSession.setNote(OIDCLoginProtocol.ISSUER, Urls.realmIssuer(uriInfo.getBaseUri(), realm.getName()));
+        clientSession.setNote(OIDCLoginProtocol.SCOPE_PARAM, scope);
 
         UserSessionModel userSession = sessions.createUserSession(realm, clientUser, clientUsername, clientConnection.getRemoteAddr(), ServiceAccountConstants.CLIENT_AUTH, false, null, null);
         event.session(userSession);
@@ -429,7 +435,7 @@ public class TokenEndpoint {
         updateUserSessionFromClientAuth(userSession);
 
         AccessTokenResponse res = tokenManager.responseBuilder(realm, client, event, session, userSession, clientSession)
-                .generateAccessToken(session, scope, client, clientUser, userSession, clientSession)
+                .generateAccessToken()
                 .generateRefreshToken()
                 .generateIDToken()
                 .build();

@@ -1,11 +1,13 @@
 package org.keycloak.adapters;
 
+import org.keycloak.adapters.spi.AdapterSessionStore;
+
 /**
  * Abstraction for storing token info on adapter side. Intended to be per-request object
  *
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
  */
-public interface AdapterTokenStore {
+public interface AdapterTokenStore extends AdapterSessionStore {
 
     /**
      * Impl can validate if current token exists and perform refreshing if it exists and is expired
@@ -25,7 +27,7 @@ public interface AdapterTokenStore {
      *
      * @param account
      */
-    void saveAccountInfo(KeycloakAccount account);
+    void saveAccountInfo(OidcKeycloakAccount account);
 
     /**
      * Handle logout on store side and possibly propagate logout call to Keycloak
@@ -39,6 +41,4 @@ public interface AdapterTokenStore {
      */
     void refreshCallback(RefreshableKeycloakSecurityContext securityContext);
 
-    void saveRequest();
-    boolean restoreRequest();
 }

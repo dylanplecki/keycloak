@@ -21,33 +21,22 @@
  */
 package org.keycloak.testsuite.adapter;
 
-import io.undertow.util.Headers;
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
-import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 import org.junit.Assert;
 import org.junit.rules.ExternalResource;
-import org.keycloak.Config;
 import org.keycloak.OAuth2Constants;
-import org.keycloak.Version;
+import org.keycloak.common.Version;
+import org.keycloak.representations.VersionRepresentation;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.constants.AdapterConstants;
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.ClientSessionModel;
 import org.keycloak.models.Constants;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
-import org.keycloak.models.UserSessionModel;
-import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.OIDCLoginProtocolService;
-import org.keycloak.protocol.oidc.TokenManager;
-import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.services.managers.RealmManager;
 import org.keycloak.services.managers.ResourceAdminManager;
-import org.keycloak.services.resources.admin.AdminRoot;
 import org.keycloak.testsuite.OAuthClient;
 import org.keycloak.testsuite.admin.ApiUtil;
 import org.keycloak.testsuite.pages.AccountSessionsPage;
@@ -58,7 +47,7 @@ import org.keycloak.testsuite.rule.WebResource;
 import org.keycloak.testsuite.rule.WebRule;
 import org.keycloak.testsuite.KeycloakServer;
 import org.keycloak.util.BasicAuthHelper;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Time;
 import org.openqa.selenium.WebDriver;
 
 import javax.ws.rs.client.Client;
@@ -66,7 +55,6 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Form;
-import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
@@ -219,9 +207,6 @@ public class AdapterTestStrategy extends ExternalResource {
         Assert.assertTrue(driver.getCurrentUrl().startsWith(LOGIN_URL));
         driver.navigate().to(APP_SERVER_BASE_URL + "/customer-portal");
         Assert.assertTrue(driver.getCurrentUrl().startsWith(LOGIN_URL));
-        loginPage.cancel();
-        System.out.println(driver.getPageSource());
-        Assert.assertTrue(driver.getPageSource().contains("Error Page"));
     }
 
     public void testServletRequestLogout() throws Exception {
@@ -458,14 +443,14 @@ public class AdapterTestStrategy extends ExternalResource {
     public void testVersion() throws Exception {
         Client client = ClientBuilder.newClient();
         WebTarget target = client.target(AUTH_SERVER_URL).path("version");
-        Version version = target.request().get(Version.class);
+        VersionRepresentation version = target.request().get(VersionRepresentation.class);
         Assert.assertNotNull(version);
         Assert.assertNotNull(version.getVersion());
         Assert.assertNotNull(version.getBuildTime());
         Assert.assertNotEquals(version.getVersion(), Version.UNKNOWN);
         Assert.assertNotEquals(version.getBuildTime(), Version.UNKNOWN);
 
-        Version version2 = client.target(APP_SERVER_BASE_URL + "/secure-portal").path(AdapterConstants.K_VERSION).request().get(Version.class);
+        VersionRepresentation version2 = client.target(APP_SERVER_BASE_URL + "/secure-portal").path(AdapterConstants.K_VERSION).request().get(VersionRepresentation.class);
         Assert.assertNotNull(version2);
         Assert.assertNotNull(version2.getVersion());
         Assert.assertNotNull(version2.getBuildTime());
@@ -619,6 +604,7 @@ public class AdapterTestStrategy extends ExternalResource {
         // logout sessions in account management
         accountSessionsPage.realm("demo");
         accountSessionsPage.open();
+        Assert.assertTrue(accountSessionsPage.isCurrent());
         accountSessionsPage.logoutAll();
 
         // Assert I need to login again (logout was propagated to the app)

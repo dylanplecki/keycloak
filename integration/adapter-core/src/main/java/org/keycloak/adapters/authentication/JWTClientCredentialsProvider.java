@@ -8,12 +8,12 @@ import org.keycloak.adapters.AdapterUtils;
 import org.keycloak.adapters.KeycloakDeployment;
 import org.keycloak.jose.jws.JWSBuilder;
 import org.keycloak.representations.JsonWebToken;
-import org.keycloak.util.KeystoreUtil;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.KeystoreUtil;
+import org.keycloak.common.util.Time;
 
 /**
  * Client authentication based on JWT signed by client private key .
- * See <a href="https://tools.ietf.org/html/draft-jones-oauth-jwt-bearer-03">specs</a> for more details.
+ * See <a href="https://tools.ietf.org/html/rfc7519">specs</a> for more details.
  *
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
  */
@@ -51,7 +51,7 @@ public class JWTClientCredentialsProvider implements ClientCredentialsProvider {
         }
 
         String clientKeystoreType = (String) cfg.get("client-keystore-type");
-        KeystoreUtil.KeystoreFormat clientKeystoreFormat = clientKeystoreType==null ? KeystoreUtil.KeystoreFormat.JKS : Enum.valueOf(KeystoreUtil.KeystoreFormat.class, clientKeystoreType);
+        KeystoreUtil.KeystoreFormat clientKeystoreFormat = clientKeystoreType==null ? KeystoreUtil.KeystoreFormat.JKS : Enum.valueOf(KeystoreUtil.KeystoreFormat.class, clientKeystoreType.toUpperCase());
 
         String clientKeystorePassword =  (String) cfg.get("client-keystore-password");
         if (clientKeystorePassword == null) {
@@ -69,8 +69,23 @@ public class JWTClientCredentialsProvider implements ClientCredentialsProvider {
         }
         this.privateKey = KeystoreUtil.loadPrivateKeyFromKeystore(clientKeystoreFile, clientKeystorePassword, clientKeyPassword, clientKeyAlias, clientKeystoreFormat);
 
-        Integer tokenExp = (Integer) cfg.get("token-timeout");
-        this.tokenTimeout = (tokenExp==null) ? 10 : tokenExp;
+        this.tokenTimeout = asInt(cfg, "token-timeout", 10);
+    }
+
+    // TODO: Generic method for this?
+    private Integer asInt(Map<String, Object> cfg, String cfgKey, int defaultValue) {
+        Object cfgObj = cfg.get(cfgKey);
+        if (cfgObj == null) {
+            return defaultValue;
+        }
+
+        if (cfgObj instanceof String) {
+            return Integer.parseInt(cfgObj.toString());
+        } else if (cfgObj instanceof Number) {
+            return ((Number) cfgObj).intValue();
+        } else {
+            throw new IllegalArgumentException("Can't parse " + cfgKey + " from the config. Value is " + cfgObj);
+        }
     }
 
     @Override

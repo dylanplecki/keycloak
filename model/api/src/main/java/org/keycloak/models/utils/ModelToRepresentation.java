@@ -10,6 +10,8 @@ import org.keycloak.models.IdentityProviderMapperModel;
 import org.keycloak.models.IdentityProviderModel;
 import org.keycloak.models.ModelException;
 import org.keycloak.models.OTPPolicy;
+import org.keycloak.models.session.PersistentClientSessionModel;
+import org.keycloak.models.session.PersistentUserSessionModel;
 import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RequiredActionProviderModel;
@@ -40,9 +42,10 @@ import org.keycloak.representations.idm.UserFederationMapperRepresentation;
 import org.keycloak.representations.idm.UserFederationProviderRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.representations.idm.UserSessionRepresentation;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Time;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -89,6 +92,7 @@ public class ModelToRepresentation {
         rep.setId(role.getId());
         rep.setName(role.getName());
         rep.setDescription(role.getDescription());
+        rep.setScopeParamRequired(role.isScopeParamRequired());
         rep.setComposite(role.isComposite());
         return rep;
     }
@@ -138,9 +142,11 @@ public class ModelToRepresentation {
         rep.setVerifyEmail(realm.isVerifyEmail());
         rep.setResetPasswordAllowed(realm.isResetPasswordAllowed());
         rep.setEditUsernameAllowed(realm.isEditUsernameAllowed());
+        rep.setRevokeRefreshToken(realm.isRevokeRefreshToken());
         rep.setAccessTokenLifespan(realm.getAccessTokenLifespan());
         rep.setSsoSessionIdleTimeout(realm.getSsoSessionIdleTimeout());
         rep.setSsoSessionMaxLifespan(realm.getSsoSessionMaxLifespan());
+        rep.setOfflineSessionIdleTimeout(realm.getOfflineSessionIdleTimeout());
         rep.setAccessCodeLifespan(realm.getAccessCodeLifespan());
         rep.setAccessCodeLifespanUserAction(realm.getAccessCodeLifespanUserAction());
         rep.setAccessCodeLifespanLogin(realm.getAccessCodeLifespanLogin());
@@ -163,6 +169,7 @@ public class ModelToRepresentation {
         if (realm.getBrowserFlow() != null) rep.setBrowserFlow(realm.getBrowserFlow().getAlias());
         if (realm.getRegistrationFlow() != null) rep.setRegistrationFlow(realm.getRegistrationFlow().getAlias());
         if (realm.getDirectGrantFlow() != null) rep.setDirectGrantFlow(realm.getDirectGrantFlow().getAlias());
+        if (realm.getResetCredentialsFlow() != null) rep.setResetCredentialsFlow(realm.getResetCredentialsFlow().getAlias());
         if (realm.getClientAuthenticationFlow() != null) rep.setClientAuthenticationFlow(realm.getClientAuthenticationFlow().getAlias());
 
         List<String> defaultRoles = realm.getDefaultRoles();
@@ -203,7 +210,10 @@ public class ModelToRepresentation {
         }
 
         rep.setInternationalizationEnabled(realm.isInternationalizationEnabled());
-        rep.getSupportedLocales().addAll(realm.getSupportedLocales());
+        if(realm.getSupportedLocales() != null){
+            rep.setSupportedLocales(new HashSet<String>());
+            rep.getSupportedLocales().addAll(realm.getSupportedLocales());
+        }
         rep.setDefaultLocale(realm.getDefaultLocale());
         if (internal) {
             exportAuthenticationFlows(realm, rep);
@@ -243,11 +253,11 @@ public class ModelToRepresentation {
         }
 
         if (realm.getEventsListeners() != null) {
-            rep.setEventsListeners(new LinkedList<String>(realm.getEventsListeners()));
+            rep.setEventsListeners(new LinkedList<>(realm.getEventsListeners()));
         }
         
         if(realm.getEnabledEventTypes() != null) {
-            rep.setEnabledEventTypes(new LinkedList<String>(realm.getEnabledEventTypes()));
+            rep.setEnabledEventTypes(new LinkedList<>(realm.getEnabledEventTypes()));
         }
         
         rep.setAdminEventsEnabled(realm.isAdminEventsEnabled());
@@ -292,6 +302,7 @@ public class ModelToRepresentation {
         rep.setId(clientModel.getId());
         rep.setClientId(clientModel.getClientId());
         rep.setName(clientModel.getName());
+        rep.setDescription(clientModel.getDescription());
         rep.setEnabled(clientModel.isEnabled());
         rep.setAdminUrl(clientModel.getManagementUrl());
         rep.setPublicClient(clientModel.isPublicClient());
@@ -304,9 +315,11 @@ public class ModelToRepresentation {
         rep.setServiceAccountsEnabled(clientModel.isServiceAccountsEnabled());
         rep.setDirectGrantsOnly(clientModel.isDirectGrantsOnly());
         rep.setSurrogateAuthRequired(clientModel.isSurrogateAuthRequired());
+        rep.setRootUrl(clientModel.getRootUrl());
         rep.setBaseUrl(clientModel.getBaseUrl());
         rep.setNotBefore(clientModel.getNotBefore());
         rep.setNodeReRegistrationTimeout(clientModel.getNodeReRegistrationTimeout());
+        rep.setClientAuthenticatorType(clientModel.getClientAuthenticatorType());
 
         Set<String> redirectUris = clientModel.getRedirectUris();
         if (redirectUris != null) {
@@ -501,10 +514,5 @@ public class ModelToRepresentation {
         rep.setProviderId(model.getProviderId());
         return rep;
     }
-
-
-
-
-
 
 }

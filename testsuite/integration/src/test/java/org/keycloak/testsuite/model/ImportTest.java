@@ -4,9 +4,10 @@ import org.junit.Assert;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
-import org.keycloak.constants.KerberosConstants;
+import org.keycloak.common.constants.KerberosConstants;
 import org.keycloak.federation.ldap.mappers.FullNameLDAPFederationMapper;
 import org.keycloak.federation.ldap.mappers.FullNameLDAPFederationMapperFactory;
+import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.Constants;
 import org.keycloak.models.FederatedIdentityModel;
@@ -23,6 +24,7 @@ import org.keycloak.models.UserFederationProvider;
 import org.keycloak.models.UserFederationProviderFactory;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.models.utils.DefaultAuthenticationFlows;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.mappers.OIDCAttributeMapperHelper;
 import org.keycloak.protocol.oidc.mappers.UserSessionNoteMapper;
@@ -71,12 +73,13 @@ public class ImportTest extends AbstractModelTest {
     // Moved to static method, so it's possible to test this from other places too (for example export-import tests)
     public static void assertDataImportedInRealm(KeycloakSession session, RealmModel realm) {
         Assert.assertTrue(realm.isVerifyEmail());
+        Assert.assertEquals(3600000, realm.getOfflineSessionIdleTimeout());
 
         List<RequiredCredentialModel> creds = realm.getRequiredCredentials();
         Assert.assertEquals(1, creds.size());
         RequiredCredentialModel cred = creds.get(0);
         Assert.assertEquals("password", cred.getFormLabel());
-        Assert.assertEquals(2, realm.getDefaultRoles().size());
+        Assert.assertEquals(3, realm.getDefaultRoles().size());
 
         Assert.assertNotNull(realm.getRole("foo"));
         Assert.assertNotNull(realm.getRole("bar"));
@@ -110,6 +113,10 @@ public class ImportTest extends AbstractModelTest {
         Assert.assertTrue(10 == appRegisteredNodes.get("node1"));
         Assert.assertTrue(20 == appRegisteredNodes.get("172.10.15.20"));
 
+        // test clientAuthenticatorType
+        Assert.assertEquals(application.getClientAuthenticatorType(), "client-secret");
+        Assert.assertEquals(otherApp.getClientAuthenticatorType(), "client-jwt");
+
         // Test finding applications by ID
         Assert.assertNull(realm.getClientById("982734"));
         Assert.assertEquals(application, realm.getClientById(application.getId()));
@@ -124,6 +131,10 @@ public class ImportTest extends AbstractModelTest {
         Assert.assertTrue(allRoles.contains(realm.getRole("admin")));
         Assert.assertTrue(allRoles.contains(application.getRole("app-admin")));
         Assert.assertTrue(allRoles.contains(otherApp.getRole("otherapp-admin")));
+
+        Assert.assertTrue(application.getRole("app-admin").isScopeParamRequired());
+        Assert.assertFalse(otherApp.getRole("otherapp-admin").isScopeParamRequired());
+        Assert.assertFalse(otherApp.getRole("otherapp-user").isScopeParamRequired());
 
         UserModel wburke =  session.users().getUserByUsername("wburke", realm);
         // user with creation timestamp in import
@@ -271,6 +282,17 @@ public class ImportTest extends AbstractModelTest {
         UserFederationProviderFactory factory = (UserFederationProviderFactory)session.getKeycloakSessionFactory().getProviderFactory(UserFederationProvider.class, "dummy");
         Assert.assertNull(factory.getInstance(session, null).getUserByUsername(realm, "wburke"));
 
+        // Test builtin authentication flows
+        AuthenticationFlowModel clientFlow = realm.getClientAuthenticationFlow();
+        Assert.assertEquals(DefaultAuthenticationFlows.CLIENT_AUTHENTICATION_FLOW, clientFlow.getAlias());
+        Assert.assertNotNull(realm.getAuthenticationFlowById(clientFlow.getId()));
+        Assert.assertTrue(realm.getAuthenticationExecutions(clientFlow.getId()).size() > 0);
+
+        AuthenticationFlowModel resetFlow = realm.getResetCredentialsFlow();
+        Assert.assertEquals(DefaultAuthenticationFlows.RESET_CREDENTIALS_FLOW, resetFlow.getAlias());
+        Assert.assertNotNull(realm.getAuthenticationFlowById(resetFlow.getId()));
+        Assert.assertTrue(realm.getAuthenticationExecutions(resetFlow.getId()).size() > 0);
+
         // Test protocol mappers. Default application has all the builtin protocol mappers. OtherApp just gss credential
         Assert.assertNotNull(application.getProtocolMapperByName(OIDCLoginProtocol.LOGIN_PROTOCOL, "username"));
         Assert.assertNotNull(application.getProtocolMapperByName(OIDCLoginProtocol.LOGIN_PROTOCOL, "email"));
@@ -322,6 +344,7 @@ public class ImportTest extends AbstractModelTest {
         RealmModel realm =manager.importRealm(rep);
 
         Assert.assertEquals(600, realm.getAccessCodeLifespanUserAction());
+        Assert.assertEquals(Constants.DEFAULT_OFFLINE_SESSION_IDLE_TIMEOUT, realm.getOfflineSessionIdleTimeout());
         verifyRequiredCredentials(realm.getRequiredCredentials(), "password");
     }
 

@@ -10,9 +10,11 @@ public class RealmRepresentation {
     protected String id;
     protected String realm;
     protected Integer notBefore;
+    protected Boolean revokeRefreshToken;
     protected Integer accessTokenLifespan;
     protected Integer ssoSessionIdleTimeout;
     protected Integer ssoSessionMaxLifespan;
+    protected Integer offlineSessionIdleTimeout;
     protected Integer accessCodeLifespan;
     protected Integer accessCodeLifespanUserAction;
     protected Integer accessCodeLifespanLogin;
@@ -90,6 +92,7 @@ public class RealmRepresentation {
     protected String browserFlow;
     protected String registrationFlow;
     protected String directGrantFlow;
+    protected String resetCredentialsFlow;
     protected String clientAuthenticationFlow;
 
     @Deprecated
@@ -165,6 +168,14 @@ public class RealmRepresentation {
         this.sslRequired = sslRequired;
     }
 
+    public Boolean getRevokeRefreshToken() {
+        return revokeRefreshToken;
+    }
+
+    public void setRevokeRefreshToken(Boolean revokeRefreshToken) {
+        this.revokeRefreshToken = revokeRefreshToken;
+    }
+
     public Integer getAccessTokenLifespan() {
         return accessTokenLifespan;
     }
@@ -187,6 +198,14 @@ public class RealmRepresentation {
 
     public void setSsoSessionMaxLifespan(Integer ssoSessionMaxLifespan) {
         this.ssoSessionMaxLifespan = ssoSessionMaxLifespan;
+    }
+
+    public Integer getOfflineSessionIdleTimeout() {
+        return offlineSessionIdleTimeout;
+    }
+
+    public void setOfflineSessionIdleTimeout(Integer offlineSessionIdleTimeout) {
+        this.offlineSessionIdleTimeout = offlineSessionIdleTimeout;
     }
 
     public List<ScopeMappingRepresentation> getScopeMappings() {
@@ -610,10 +629,14 @@ public class RealmRepresentation {
     }
 
     public Set<String> getSupportedLocales() {
-        if(supportedLocales == null){
-            supportedLocales = new HashSet<String>();
-        }
         return supportedLocales;
+    }
+
+    public void addSupportedLocales(String locale) {
+        if(supportedLocales == null){
+            supportedLocales = new HashSet<>();
+        }
+        supportedLocales.add(locale);
     }
 
     public void setSupportedLocales(Set<String> supportedLocales) {
@@ -735,6 +758,14 @@ public class RealmRepresentation {
 
     public void setDirectGrantFlow(String directGrantFlow) {
         this.directGrantFlow = directGrantFlow;
+    }
+
+    public String getResetCredentialsFlow() {
+        return resetCredentialsFlow;
+    }
+
+    public void setResetCredentialsFlow(String resetCredentialsFlow) {
+        this.resetCredentialsFlow = resetCredentialsFlow;
     }
 
     public String getClientAuthenticationFlow() {

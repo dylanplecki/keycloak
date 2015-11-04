@@ -23,6 +23,9 @@ import org.keycloak.models.CredentialValidationOutput;
 import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ModelDuplicateException;
+import org.keycloak.models.ModelException;
+import org.keycloak.models.session.PersistentClientSessionModel;
+import org.keycloak.models.session.PersistentUserSessionModel;
 import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RequiredActionProviderModel;
@@ -32,6 +35,8 @@ import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserProvider;
 import org.keycloak.models.entities.FederatedIdentityEntity;
+import org.keycloak.models.entities.PersistentClientSessionEntity;
+import org.keycloak.models.entities.PersistentUserSessionEntity;
 import org.keycloak.models.entities.UserEntity;
 import org.keycloak.models.file.adapter.UserAdapter;
 import org.keycloak.models.utils.CredentialValidation;
@@ -41,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -255,22 +261,18 @@ public class FileUserProvider implements UserProvider {
     }
 
     @Override
-    public List<UserModel> searchForUserByUserAttributes(Map<String, String> attributes, RealmModel realm) {
+    public List<UserModel> searchForUserByUserAttribute(String attrName, String attrValue, RealmModel realm) {
         Collection<UserModel> users = inMemoryModel.getUsers(realm.getId());
 
-        for (Map.Entry<String, String> entry : attributes.entrySet()) {
-
-            List<UserModel> matchedUsers = new ArrayList<>();
-            for (UserModel user : users) {
-                List<String> vals = user.getAttribute(entry.getKey());
-                if (vals.contains(entry.getValue())) {
-                    matchedUsers.add(user);
-                }
+        List<UserModel> matchedUsers = new ArrayList<>();
+        for (UserModel user : users) {
+            List<String> vals = user.getAttribute(attrName);
+            if (vals.contains(attrValue)) {
+                matchedUsers.add(user);
             }
-            users = matchedUsers;
         }
 
-        return (List<UserModel>) users;
+        return matchedUsers;
     }
 
     @Override
@@ -421,6 +423,13 @@ public class FileUserProvider implements UserProvider {
     }
 
     @Override
+    public void grantToAllUsers(RealmModel realm, RoleModel role) {
+        for (UserModel user : inMemoryModel.getUsers(realm.getId())) {
+            user.grantRole(role);
+        }
+    }
+
+    @Override
     public void preRemove(RealmModel realm) {
         // Nothing to do here?  Federation links are attached to users, which are removed by InMemoryModel
     }
@@ -492,5 +501,4 @@ public class FileUserProvider implements UserProvider {
         //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         return null; // not supported yet
     }
-
 }

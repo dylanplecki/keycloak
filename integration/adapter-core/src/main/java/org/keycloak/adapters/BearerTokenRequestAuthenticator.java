@@ -2,7 +2,10 @@ package org.keycloak.adapters;
 
 import org.jboss.logging.Logger;
 import org.keycloak.RSATokenVerifier;
-import org.keycloak.VerificationException;
+import org.keycloak.adapters.spi.AuthChallenge;
+import org.keycloak.adapters.spi.AuthOutcome;
+import org.keycloak.adapters.spi.HttpFacade;
+import org.keycloak.common.VerificationException;
 import org.keycloak.representations.AccessToken;
 
 import javax.security.cert.X509Certificate;
@@ -115,6 +118,11 @@ public class BearerTokenRequestAuthenticator {
             }
 
             @Override
+            public int getResponseCode() {
+                return 0;
+            }
+
+            @Override
             public boolean challenge(HttpFacade exchange) {
                 // do the same thing as client cert auth
                 return false;
@@ -137,6 +145,11 @@ public class BearerTokenRequestAuthenticator {
             @Override
             public boolean errorPage() {
                 return true;
+            }
+
+            @Override
+            public int getResponseCode() {
+                return 401;
             }
 
             @Override

@@ -1,24 +1,22 @@
 package org.keycloak.models.utils;
 
 import org.bouncycastle.openssl.PEMWriter;
-import org.keycloak.constants.KerberosConstants;
-import org.keycloak.constants.ServiceAccountConstants;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.Constants;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.KeycloakSessionTask;
 import org.keycloak.models.KeycloakTransaction;
 import org.keycloak.models.ModelDuplicateException;
 import org.keycloak.models.RealmModel;
-import org.keycloak.models.RequiredCredentialModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserFederationMapperModel;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.representations.idm.CertificateRepresentation;
-import org.keycloak.util.CertificateUtils;
-import org.keycloak.util.PemUtils;
+import org.keycloak.common.util.CertificateUtils;
+import org.keycloak.common.util.PemUtils;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
@@ -180,12 +178,17 @@ public final class KeycloakModelUtils {
         return secret;
     }
 
+    public static String getDefaultClientAuthenticatorType() {
+        return "client-secret";
+    }
+
     public static String generateCodeSecret() {
         return UUID.randomUUID().toString();
     }
 
     public static ClientModel createClient(RealmModel realm, String name) {
         ClientModel app = realm.addClient(name);
+        app.setClientAuthenticatorType(getDefaultClientAuthenticatorType());
         generateSecret(app);
         app.setFullScopeAllowed(true);
 
@@ -354,5 +357,14 @@ public final class KeycloakModelUtils {
 
     public static String toLowerCaseSafe(String str) {
         return str==null ? null : str.toLowerCase();
+    }
+
+    public static void setupOfflineTokens(RealmModel realm) {
+        if (realm.getRole(Constants.OFFLINE_ACCESS_ROLE) == null) {
+            RoleModel role = realm.addRole(Constants.OFFLINE_ACCESS_ROLE);
+            role.setDescription("${role_offline-access}");
+            role.setScopeParamRequired(true);
+            realm.addDefaultRole(Constants.OFFLINE_ACCESS_ROLE);
+        }
     }
 }

@@ -5,12 +5,13 @@ import java.io.IOException;
 import org.jboss.logging.Logger;
 import org.keycloak.KeycloakPrincipal;
 import org.keycloak.RSATokenVerifier;
-import org.keycloak.VerificationException;
+import org.keycloak.adapters.spi.HttpFacade;
+import org.keycloak.common.VerificationException;
 import org.keycloak.constants.AdapterConstants;
 import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.IDToken;
-import org.keycloak.util.KeycloakUriBuilder;
+import org.keycloak.common.util.KeycloakUriBuilder;
 
 /**
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
@@ -34,7 +35,7 @@ public class CookieTokenStore {
     }
 
     public static KeycloakPrincipal<RefreshableKeycloakSecurityContext> getPrincipalFromCookie(KeycloakDeployment deployment, HttpFacade facade, AdapterTokenStore tokenStore) {
-        HttpFacade.Cookie cookie = facade.getRequest().getCookie(AdapterConstants.KEYCLOAK_ADAPTER_STATE_COOKIE);
+        OIDCHttpFacade.Cookie cookie = facade.getRequest().getCookie(AdapterConstants.KEYCLOAK_ADAPTER_STATE_COOKIE);
         if (cookie == null) {
             log.debug("Not found adapter state cookie in current request");
             return null;
@@ -54,7 +55,7 @@ public class CookieTokenStore {
 
         try {
             // Skip check if token is active now. It's supposed to be done later by the caller
-            AccessToken accessToken = RSATokenVerifier.verifyToken(accessTokenString, deployment.getRealmKey(), deployment.getRealmInfoUrl(), false);
+            AccessToken accessToken = RSATokenVerifier.verifyToken(accessTokenString, deployment.getRealmKey(), deployment.getRealmInfoUrl(), false, true);
             IDToken idToken;
             if (idTokenString != null && idTokenString.length() > 0) {
                 JWSInput input = new JWSInput(idTokenString);

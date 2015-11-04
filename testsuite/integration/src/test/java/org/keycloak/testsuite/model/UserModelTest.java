@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserModel.RequiredAction;
 import org.keycloak.services.managers.ClientManager;
@@ -193,8 +194,8 @@ public class UserModelTest extends AbstractModelTest {
         Assert.assertEquals("val23", attrVals.get(0));
     }
 
-    // @Test
-    public void testSearchByUserAttributes() throws Exception {
+    @Test
+    public void testSearchByUserAttribute() throws Exception {
         RealmModel realm = realmManager.createRealm("original");
         UserModel user1 = session.users().addUser(realm, "user1");
         UserModel user2 = session.users().addUser(realm, "user2");
@@ -210,20 +211,21 @@ public class UserModelTest extends AbstractModelTest {
 
         commit();
 
-        Map<String, String> attributes = new HashMap<String, String>();
-        attributes.put("key1", "value1");
-        List<UserModel> users = session.users().searchForUserByUserAttributes(attributes, realm);
+        List<UserModel> users = session.users().searchForUserByUserAttribute("key1", "value1", realm);
         Assert.assertEquals(2, users.size());
         Assert.assertTrue(users.contains(user1));
         Assert.assertTrue(users.contains(user2));
 
-        attributes.put("key2", "value21");
-        users = session.users().searchForUserByUserAttributes(attributes, realm);
-        Assert.assertEquals(1, users.size());
+        users = session.users().searchForUserByUserAttribute("key2", "value21", realm);
+        Assert.assertEquals(2, users.size());
         Assert.assertTrue(users.contains(user1));
+        Assert.assertTrue(users.contains(user3));
 
-        attributes.put("key3", "value3");
-        users = session.users().searchForUserByUserAttributes(attributes, realm);
+        users = session.users().searchForUserByUserAttribute("key2", "value22", realm);
+        Assert.assertEquals(1, users.size());
+        Assert.assertTrue(users.contains(user2));
+
+        users = session.users().searchForUserByUserAttribute("key3", "value3", realm);
         Assert.assertEquals(0, users.size());
     }
 
@@ -280,6 +282,36 @@ public class UserModelTest extends AbstractModelTest {
         // Assert service account removed as well
         realm = realmManager.getRealmByName("original");
         Assert.assertNull(session.users().getUserByUsername("user1", realm));
+    }
+
+    @Test
+    public void testGrantToAll() {
+        RealmModel realm1 = realmManager.createRealm("realm1");
+        RoleModel role1 = realm1.addRole("role1");
+        UserModel user1 = realmManager.getSession().users().addUser(realm1, "user1");
+        UserModel user2 = realmManager.getSession().users().addUser(realm1, "user2");
+
+        RealmModel realm2 = realmManager.createRealm("realm2");
+        UserModel realm2User1 = realmManager.getSession().users().addUser(realm2, "user1");
+
+        commit();
+
+        realm1 = realmManager.getRealmByName("realm1");
+        role1 = realm1.getRole("role1");
+        realmManager.getSession().users().grantToAllUsers(realm1, role1);
+
+        commit();
+
+        realm1 = realmManager.getRealmByName("realm1");
+        role1 = realm1.getRole("role1");
+        user1 = realmManager.getSession().users().getUserByUsername("user1", realm1);
+        user2 = realmManager.getSession().users().getUserByUsername("user2", realm1);
+        Assert.assertTrue(user1.hasRole(role1));
+        Assert.assertTrue(user2.hasRole(role1));
+
+        realm2 = realmManager.getRealmByName("realm2");
+        realm2User1 = realmManager.getSession().users().getUserByUsername("user1", realm2);
+        Assert.assertFalse(realm2User1.hasRole(role1));
     }
 
     public static void assertEquals(UserModel expected, UserModel actual) {

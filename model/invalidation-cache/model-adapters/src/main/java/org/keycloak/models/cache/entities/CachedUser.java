@@ -4,7 +4,7 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserCredentialValueModel;
 import org.keycloak.models.UserModel;
-import org.keycloak.util.MultivaluedHashMap;
+import org.keycloak.common.util.MultivaluedHashMap;
 
 import java.io.Serializable;
 import java.util.HashSet;
@@ -25,14 +25,14 @@ public class CachedUser implements Serializable {
     private String lastName;
     private String email;
     private boolean emailVerified;
-    private List<UserCredentialValueModel> credentials = new LinkedList<UserCredentialValueModel>();
+    private List<UserCredentialValueModel> credentials = new LinkedList<>();
     private boolean enabled;
     private boolean totp;
     private String federationLink;
     private String serviceAccountClientLink;
     private MultivaluedHashMap<String, String> attributes = new MultivaluedHashMap<>();
     private Set<String> requiredActions = new HashSet<>();
-    private Set<String> roleMappings = new HashSet<String>();
+    private Set<String> roleMappings = new HashSet<>();
 
     public CachedUser(RealmModel realm, UserModel user) {
         this.id = user.getId();

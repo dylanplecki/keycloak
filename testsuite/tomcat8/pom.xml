@@ -4,7 +4,7 @@
     <parent>
         <artifactId>keycloak-testsuite-pom</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -56,6 +56,24 @@
                 </exclusion>
             </exclusions>
         </dependency>
+       <dependency>
+           <groupId>org.keycloak</groupId>
+           <artifactId>keycloak-saml-tomcat8-adapter</artifactId>
+           <exclusions>
+               <exclusion>
+                   <groupId>org.apache.tomcat</groupId>
+                   <artifactId>tomcat-servlet-api</artifactId>
+               </exclusion>
+               <exclusion>
+                   <groupId>org.apache.tomcat</groupId>
+                   <artifactId>tomcat-catalina</artifactId>
+               </exclusion>
+               <exclusion>
+                   <groupId>org.apache.tomcat</groupId>
+                   <artifactId>catalina</artifactId>
+               </exclusion>
+           </exclusions>
+       </dependency>
         <dependency>
             <groupId>org.jboss.resteasy</groupId>
             <artifactId>resteasy-client</artifactId>
@@ -134,7 +152,7 @@
         </dependency>
         <dependency>
             <groupId>org.hibernate.javax.persistence</groupId>
-            <artifactId>hibernate-jpa-2.1-api</artifactId>
+            <artifactId>${hibernate.javax.persistence.artifactId}</artifactId>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>

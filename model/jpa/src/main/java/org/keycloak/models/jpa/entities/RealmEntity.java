@@ -76,10 +76,14 @@ public class RealmEntity {
     @Column(name="EDIT_USERNAME_ALLOWED")
     protected boolean editUsernameAllowed;
 
+    @Column(name="REVOKE_REFRESH_TOKEN")
+    private boolean revokeRefreshToken;
     @Column(name="SSO_IDLE_TIMEOUT")
     private int ssoSessionIdleTimeout;
     @Column(name="SSO_MAX_LIFESPAN")
     private int ssoSessionMaxLifespan;
+    @Column(name="OFFLINE_SESSION_IDLE_TIMEOUT")
+    private int offlineSessionIdleTimeout;
     @Column(name="ACCESS_TOKEN_LIFESPAN")
     protected int accessTokenLifespan;
     @Column(name="ACCESS_CODE_LIFESPAN")
@@ -288,6 +292,14 @@ public class RealmEntity {
         this.editUsernameAllowed = editUsernameAllowed;
     }
 
+    public boolean isRevokeRefreshToken() {
+        return revokeRefreshToken;
+    }
+
+    public void setRevokeRefreshToken(boolean revokeRefreshToken) {
+        this.revokeRefreshToken = revokeRefreshToken;
+    }
+
     public int getSsoSessionIdleTimeout() {
         return ssoSessionIdleTimeout;
     }
@@ -302,6 +314,14 @@ public class RealmEntity {
 
     public void setSsoSessionMaxLifespan(int ssoSessionMaxLifespan) {
         this.ssoSessionMaxLifespan = ssoSessionMaxLifespan;
+    }
+
+    public int getOfflineSessionIdleTimeout() {
+        return offlineSessionIdleTimeout;
+    }
+
+    public void setOfflineSessionIdleTimeout(int offlineSessionIdleTimeout) {
+        this.offlineSessionIdleTimeout = offlineSessionIdleTimeout;
     }
 
     public int getAccessTokenLifespan() {

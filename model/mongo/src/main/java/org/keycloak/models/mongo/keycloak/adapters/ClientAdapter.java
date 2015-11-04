@@ -71,6 +71,15 @@ public class ClientAdapter extends AbstractMongoAdapter<MongoClientEntity> imple
     }
 
     @Override
+    public String getDescription() { return getMongoEntity().getDescription(); }
+
+    @Override
+    public void setDescription(String description) {
+        getMongoEntity().setDescription(description);
+        updateMongoEntity();
+    }
+
+    @Override
     public void setClientId(String clientId) {
         getMongoEntity().setClientId(clientId);
         updateMongoEntity();
@@ -138,6 +147,17 @@ public class ClientAdapter extends AbstractMongoAdapter<MongoClientEntity> imple
     @Override
     public void setEnabled(boolean enabled) {
         getMongoEntity().setEnabled(enabled);
+        updateMongoEntity();
+    }
+
+    @Override
+    public String getClientAuthenticatorType() {
+        return getMongoEntity().getClientAuthenticatorType();
+    }
+
+    @Override
+    public void setClientAuthenticatorType(String clientAuthenticatorType) {
+        getMongoEntity().setClientAuthenticatorType(clientAuthenticatorType);
         updateMongoEntity();
     }
 
@@ -426,6 +446,17 @@ public class ClientAdapter extends AbstractMongoAdapter<MongoClientEntity> imple
     public void setManagementUrl(String url) {
         getMongoEntity().setManagementUrl(url);
         updateMongoEntity();
+    }
+
+    @Override
+    public void setRootUrl(String url) {
+        getMongoEntity().setRootUrl(url);
+        updateMongoEntity();
+    }
+
+    @Override
+    public String getRootUrl() {
+        return getMongoEntity().getRootUrl();
     }
 
     @Override

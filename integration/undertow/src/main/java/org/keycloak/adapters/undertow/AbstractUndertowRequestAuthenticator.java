@@ -23,7 +23,7 @@ import io.undertow.util.Sessions;
 
 import org.keycloak.KeycloakPrincipal;
 import org.keycloak.adapters.AdapterTokenStore;
-import org.keycloak.adapters.HttpFacade;
+import org.keycloak.adapters.spi.HttpFacade;
 import org.keycloak.adapters.KeycloakDeployment;
 import org.keycloak.adapters.OAuthRequestAuthenticator;
 import org.keycloak.adapters.RefreshableKeycloakSecurityContext;
@@ -48,7 +48,7 @@ public abstract class AbstractUndertowRequestAuthenticator extends RequestAuthen
     }
 
     protected void propagateKeycloakContext(KeycloakUndertowAccount account) {
-        exchange.putAttachment(UndertowHttpFacade.KEYCLOAK_SECURITY_CONTEXT_KEY, account.getKeycloakSecurityContext());
+        exchange.putAttachment(OIDCUndertowHttpFacade.KEYCLOAK_SECURITY_CONTEXT_KEY, account.getKeycloakSecurityContext());
     }
 
     @Override

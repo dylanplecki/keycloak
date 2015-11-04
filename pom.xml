@@ -14,14 +14,17 @@
     </description>
     <groupId>org.keycloak</groupId>
     <artifactId>keycloak-parent</artifactId>
-    <version>1.5.0.Final-SNAPSHOT</version>
+    <version>1.7.0.Final-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <properties>
+        <product.name>Keycloak</product.name>
+        <product.version>${project.version}</product.version>
+        <product.build-time>${timestamp}</product.build-time>
+
         <apacheds.version>2.0.0-M17</apacheds.version>
         <apacheds.codec.version>1.0.0-M23</apacheds.codec.version>
         <org.apache.james.apache-mime4j.version>0.6</org.apache.james.apache-mime4j.version>
-        <base64.version>2.3.8</base64.version>
         <bouncycastle.crypto.version>1.50</bouncycastle.crypto.version>
         <jackson.version>1.9.9</jackson.version>
         <apache.httpcomponents.version>4.3.6</apache.httpcomponents.version>
@@ -36,9 +39,8 @@
         <syslog4j.version>0.9.30</syslog4j.version>
         <jboss-logging-tools.version>1.2.0.Beta1</jboss-logging-tools.version>
         <jboss.spec.javax.xml.bind.jboss-jaxb-api_2.2_spec.version>1.0.4.Final</jboss.spec.javax.xml.bind.jboss-jaxb-api_2.2_spec.version>
-        <io.netty.version>4.0.26.Final</io.netty.version> 
-        <xnio.netty.netty-xnio-transport.version>0.1.1.Final</xnio.netty.netty-xnio-transport.version>
         <hibernate.javax.persistence.version>1.0.0.Final</hibernate.javax.persistence.version>
+        <hibernate.javax.persistence.artifactId>hibernate-jpa-2.1-api</hibernate.javax.persistence.artifactId>
         <hibernate.entitymanager.version>4.3.10.Final</hibernate.entitymanager.version>
         <h2.version>1.4.187</h2.version>
         <mysql.version>5.1.29</mysql.version>
@@ -54,19 +56,17 @@
         <jboss.version>7.5.0.Final-redhat-15</jboss.version>
 
         <servlet.api.30.version>1.0.2.Final</servlet.api.30.version>
-        <google.zxing.version>2.2</google.zxing.version>
-        <google.client.version>1.14.1-beta</google.client.version>
+        <google.zxing.version>3.2.1</google.zxing.version>
         <github.relaxng.version>2011.1</github.relaxng.version>
-        <winzipaes.version>1.0.1</winzipaes.version>
-        <freemarker.version>2.3.20</freemarker.version>
-        <twitter4j.version>3.0.5</twitter4j.version>
+        <freemarker.version>2.3.23</freemarker.version>
+        <twitter4j.version>4.0.4</twitter4j.version>
         <selenium.version>2.35.0</selenium.version>
         <sun.istack.version>2.21</sun.istack.version>
         <sun.jaxb.version>2.2.11</sun.jaxb.version>
         <sun.xsom.version>20140925</sun.xsom.version>
         <javax.mail.version>1.4.5</javax.mail.version>
         <infinispan.version>6.0.2.Final</infinispan.version>
-        <liquibase.version>3.3.5</liquibase.version>
+        <liquibase.version>3.4.1</liquibase.version>
         <jetty9.version>9.1.0.v20131115</jetty9.version>
         <osgi.version>4.2.0</osgi.version>
         <pax.web.version>3.1.2</pax.web.version>
@@ -133,8 +133,9 @@
     </contributors>
 
     <modules>
+        <module>common</module>
         <module>core</module>
-        <module>core-jaxrs</module>
+        <module>client-api</module>
         <module>connections</module>
         <module>dependencies</module>
         <module>events</module>
@@ -192,11 +193,6 @@
                 <version>${bouncycastle.crypto.version}</version>
             </dependency>
             <dependency>
-                <groupId>net.iharder</groupId>
-                <artifactId>base64</artifactId>
-                <version>${base64.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>javax.mail</groupId>
                 <artifactId>mail</artifactId>
                 <version>${javax.mail.version}</version>
@@ -236,16 +232,6 @@
                 <groupId>org.jboss.spec.javax.xml.bind</groupId>
                 <artifactId>jboss-jaxb-api_2.2_spec</artifactId>
                 <version>${jboss.spec.javax.xml.bind.jboss-jaxb-api_2.2_spec.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-all</artifactId>
-                <version>${io.netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jboss.xnio.netty</groupId>
-                <artifactId>netty-xnio-transport</artifactId>
-                <version>${xnio.netty.netty-xnio-transport.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
@@ -322,7 +308,7 @@
             </dependency>
             <dependency>
                 <groupId>org.hibernate.javax.persistence</groupId>
-                <artifactId>hibernate-jpa-2.1-api</artifactId>
+                <artifactId>${hibernate.javax.persistence.artifactId}</artifactId>
                 <version>${hibernate.javax.persistence.version}</version>
             </dependency>
             <dependency>
@@ -384,13 +370,6 @@
                 <artifactId>greenmail</artifactId>
                 <version>${greenmail.version}</version>
                 <scope>test</scope>
-            </dependency>
-
-            <!-- Encrypted ZIP -->
-            <dependency>
-                <groupId>de.idyl</groupId>
-                <artifactId>winzipaes</artifactId>
-                <version>${winzipaes.version}</version>
             </dependency>
 
             <!-- Apache DS -->
@@ -655,12 +634,17 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
-                <artifactId>keycloak-core-jaxrs</artifactId>
+                <artifactId>keycloak-client-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -706,11 +690,6 @@
             <dependency>
                 <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-export-import-single-file</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.keycloak</groupId>
-                <artifactId>keycloak-export-import-zip</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -767,6 +746,16 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-adapter-spi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-servlet-adapter-spi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-adapter-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -782,6 +771,11 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-as7-adapter-spi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-installed-adapter</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -793,6 +787,11 @@
             <dependency>
                 <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-jboss-adapter-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-jetty-adapter-spi</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -867,6 +866,11 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-tomcat-adapter-spi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-tomcat-core-adapter</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -877,12 +881,52 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-servlet-filter-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-servlet-filter-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-tomcat6-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-as7-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-as7-subsystem</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-tomcat7-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-tomcat8-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-tomcat7-adapter</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-tomcat8-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-undertow-adapter-spi</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -967,6 +1011,51 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-adapter-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-tomcat-adapter-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-jetty-adapter-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-jetty81-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-jetty91-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-wildfly-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-wf9-subsystem</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-jetty92-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-undertow-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-services</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -1023,6 +1112,12 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-as7-modules</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-as7-modules</artifactId>
                 <version>${project.version}</version>
                 <type>zip</type>
@@ -1041,7 +1136,19 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-wf9-modules</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-wf9-adapter-dist</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-wf9-adapter-dist</artifactId>
                 <version>${project.version}</version>
                 <type>zip</type>
             </dependency>
@@ -1166,6 +1273,48 @@
             </dependency>
             <dependency>
                 <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-tomcat6-adapter-dist</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-tomcat7-adapter-dist</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-tomcat8-adapter-dist</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-jetty81-adapter-dist</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-jetty92-adapter-dist</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-as7-adapter-dist</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-saml-eap6-adapter-dist</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+            <dependency>
+                <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-testsuite-integration</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -1223,6 +1372,15 @@
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-release-plugin</artifactId>
+                    <version>2.5.2</version>
+                    <configuration>
+                        <autoVersionSubmodules>true</autoVersionSubmodules>
+                        <tagNameFormat>@{project.version}</tagNameFormat>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
@@ -1319,6 +1477,48 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>distribution</id>
+            <modules>
+                <module>distribution</module>
+            </modules>
+        </profile>
+
+        <profile>
+            <id>jboss-release</id>
+            <modules>
+                <module>docbook</module>
+                <module>distribution</module>
+            </modules>
+        </profile>
+
+        <profile>
+            <id>doclint-java8-disable</id>
+            <activation>
+                <jdk>[1.8,)</jdk>
+            </activation>
+
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <configuration>
+                            <additionalparam>-Xdoclint:none</additionalparam>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>arquillian-integration-tests</id>
+            <modules>
+                <module>distribution</module>
+                <module>testsuite/integration-arquillian</module>
+            </modules>
+        </profile>
+
         <!-- Configure the JBoss Early Access Maven repository -->
         <profile>
             <id>jboss-earlyaccess-repository</id>
@@ -1351,64 +1551,6 @@
                     </snapshots>
                 </pluginRepository>
             </pluginRepositories>
-        </profile>
-        <profile>
-            <id>distribution</id>
-            <modules>
-                <module>distribution</module>
-                <module>testsuite/integration-arquillian</module>
-            </modules>
-        </profile>
-        <profile>
-            <id>jboss-release</id>
-            <modules>
-                <module>docbook</module>
-                <module>distribution</module>
-                <module>testsuite/integration-arquillian</module>
-            </modules>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-javadoc-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>aggregate</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>aggregate</goal>
-                                </goals>
-                                <configuration>
-                                    <minmemory>128m</minmemory>
-                                    <maxmemory>1024m</maxmemory>
-                                    <aggregate>true</aggregate>
-                                    <excludePackageNames>
-                                        se.unlogic.*:com.restfully.*:org.jboss.resteasy.examples.*:org.jboss.resteasy.tests.*
-                                    </excludePackageNames>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>          
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>doclint-java8-disable</id>
-            <activation>
-                <jdk>[1.8,)</jdk>
-            </activation>
-
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-javadoc-plugin</artifactId>
-                        <configuration>
-                            <additionalparam>-Xdoclint:none</additionalparam>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
         </profile>
     </profiles>
 </project>

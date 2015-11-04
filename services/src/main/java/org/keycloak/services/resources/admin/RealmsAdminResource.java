@@ -2,11 +2,9 @@ package org.keycloak.services.resources.admin;
 
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.annotations.cache.NoCache;
-import org.jboss.resteasy.plugins.providers.multipart.InputPart;
-import org.jboss.resteasy.plugins.providers.multipart.MultipartFormDataInput;
 import org.jboss.resteasy.spi.NotFoundException;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.models.AdminRoles;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakSession;
@@ -20,7 +18,6 @@ import org.keycloak.services.ForbiddenException;
 import org.keycloak.services.managers.RealmManager;
 import org.keycloak.services.resources.KeycloakApplication;
 import org.keycloak.services.ErrorResponse;
-import org.keycloak.util.JsonSerialization;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -35,11 +32,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Top level resource for Admin REST API
@@ -73,7 +68,9 @@ public class RealmsAdminResource {
     }
 
     /**
-     * Returns a list of realms.  This list is filtered based on what realms the caller is allowed to view.
+     * Get accessible realms
+     *
+     * Returns a list of accessible realms. The list is filtered based on what realms the caller is allowed to view.
      *
      * @return
      */
@@ -107,10 +104,12 @@ public class RealmsAdminResource {
     }
 
     /**
-     * Import a realm from a full representation of that realm.  Realm name must be unique.
+     * Import a realm
+     *
+     * Imports a realm from a full representation of that realm.  Realm name must be unique.
      *
      * @param uriInfo
-     * @param rep JSON representation
+     * @param rep JSON representation of the realm
      * @return
      */
     @POST
@@ -140,49 +139,6 @@ public class RealmsAdminResource {
         }
     }
 
-    /**
-     * Upload a realm from a uploaded JSON file.  The posted represenation is expected to be a multipart/form-data encapsulation
-     * of a JSON file.  The same format a browser would use when uploading a file.
-     *
-     * @param uriInfo
-     * @param input multipart/form data
-     * @return
-     * @throws IOException
-     */
-    @POST
-    @Consumes(MediaType.MULTIPART_FORM_DATA)
-    public Response uploadRealm(@Context final UriInfo uriInfo, MultipartFormDataInput input) throws IOException {
-        RealmManager realmManager = new RealmManager(session);
-        realmManager.setContextPath(keycloak.getContextPath());
-        if (!auth.getRealm().equals(realmManager.getKeycloakAdminstrationRealm())) {
-            throw new ForbiddenException();
-        }
-        if (!auth.hasRealmRole(AdminRoles.CREATE_REALM)) {
-            throw new ForbiddenException();
-        }
-
-        Map<String, List<InputPart>> uploadForm = input.getFormDataMap();
-        List<InputPart> inputParts = uploadForm.get("file");
-        RealmRepresentation rep = null;
-        
-        for (InputPart inputPart : inputParts) {
-            // inputPart.getBody doesn't work as content-type is wrong, and inputPart.setMediaType is not supported on AS7 (RestEasy 2.3.2.Final)
-            rep = JsonSerialization.readValue(inputPart.getBodyAsString(), RealmRepresentation.class);
-
-            RealmModel realm = realmManager.importRealm(rep);
-
-            grantPermissionsToRealmCreator(realm);
-            
-            URI location = null;
-            if (inputParts.size() == 1) {
-                location = AdminRoot.realmsUrl(uriInfo).path(realm.getName()).build();
-                return Response.created(location).build();
-            }
-        }
-        
-        return Response.noContent().build();
-    }
-
     private void grantPermissionsToRealmCreator(RealmModel realm) {
         if (auth.hasRealmRole(AdminRoles.ADMIN)) {
             return;
@@ -208,7 +164,7 @@ public class RealmsAdminResource {
                                             @PathParam("realm") final String name) {
         RealmManager realmManager = new RealmManager(session);
         RealmModel realm = realmManager.getRealmByName(name);
-        if (realm == null) throw new NotFoundException("{realm} = " + name);
+        if (realm == null) throw new NotFoundException("Realm not found.");
 
         if (!auth.getRealm().equals(realmManager.getKeycloakAdminstrationRealm())
                 && !auth.getRealm().equals(realm)) {

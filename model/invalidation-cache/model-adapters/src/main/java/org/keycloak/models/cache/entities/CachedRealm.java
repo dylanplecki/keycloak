@@ -1,6 +1,6 @@
 package org.keycloak.models.cache.entities;
 
-import org.keycloak.enums.SslRequired;
+import org.keycloak.common.enums.SslRequired;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.AuthenticatorConfigModel;
@@ -17,7 +17,7 @@ import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserFederationMapperModel;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.cache.RealmCache;
-import org.keycloak.util.MultivaluedHashMap;
+import org.keycloak.common.util.MultivaluedHashMap;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -33,7 +33,6 @@ import java.util.Set;
  * @version $Revision: 1 $
  */
 public class CachedRealm implements Serializable {
-    private static final long serialVersionUID = 1L;
 
     private String id;
     private String name;
@@ -56,8 +55,10 @@ public class CachedRealm implements Serializable {
     private int failureFactor;
     //--- end brute force settings
 
+    private boolean revokeRefreshToken;
     private int ssoSessionIdleTimeout;
     private int ssoSessionMaxLifespan;
+    private int offlineSessionIdleTimeout;
     private int accessTokenLifespan;
     private int accessCodeLifespan;
     private int accessCodeLifespanUserAction;
@@ -137,8 +138,10 @@ public class CachedRealm implements Serializable {
         failureFactor = model.getFailureFactor();
         //--- end brute force settings
 
+        revokeRefreshToken = model.isRevokeRefreshToken();
         ssoSessionIdleTimeout = model.getSsoSessionIdleTimeout();
         ssoSessionMaxLifespan = model.getSsoSessionMaxLifespan();
+        offlineSessionIdleTimeout = model.getOfflineSessionIdleTimeout();
         accessTokenLifespan = model.getAccessTokenLifespan();
         accessCodeLifespan = model.getAccessCodeLifespan();
         accessCodeLifespanUserAction = model.getAccessCodeLifespanUserAction();
@@ -314,12 +317,20 @@ public class CachedRealm implements Serializable {
         return editUsernameAllowed;
     }
 
+    public boolean isRevokeRefreshToken() {
+        return revokeRefreshToken;
+    }
+
     public int getSsoSessionIdleTimeout() {
         return ssoSessionIdleTimeout;
     }
 
     public int getSsoSessionMaxLifespan() {
         return ssoSessionMaxLifespan;
+    }
+
+    public int getOfflineSessionIdleTimeout() {
+        return offlineSessionIdleTimeout;
     }
 
     public int getAccessTokenLifespan() {

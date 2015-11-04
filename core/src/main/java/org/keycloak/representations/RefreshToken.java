@@ -1,6 +1,6 @@
 package org.keycloak.representations;
 
-import org.codehaus.jackson.annotate.JsonProperty;
+import org.keycloak.util.TokenUtil;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,9 +11,8 @@ import java.util.Map;
  */
 public class RefreshToken extends AccessToken {
 
-
     private RefreshToken() {
-        type("REFRESH");
+        type(TokenUtil.TOKEN_TYPE_REFRESH);
     }
 
     /**

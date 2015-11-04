@@ -2,6 +2,7 @@ package org.keycloak.models;
 
 import org.keycloak.provider.Provider;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,10 +38,12 @@ public interface UserProvider extends Provider {
     List<UserModel> searchForUserByAttributes(Map<String, String> attributes, RealmModel realm, int firstResult, int maxResults);
 
     // Searching by UserModel.attribute (not property)
-    List<UserModel> searchForUserByUserAttributes(Map<String, String> attributes, RealmModel realm);
+    List<UserModel> searchForUserByUserAttribute(String attrName, String attrValue, RealmModel realm);
 
     Set<FederatedIdentityModel> getFederatedIdentities(UserModel user, RealmModel realm);
     FederatedIdentityModel getFederatedIdentity(UserModel user, String socialProvider, RealmModel realm);
+
+    void grantToAllUsers(RealmModel realm, RoleModel role);
 
     void preRemove(RealmModel realm);
 

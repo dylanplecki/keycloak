@@ -9,8 +9,7 @@ import org.junit.rules.TestRule;
 import org.junit.runners.model.Statement;
 import org.keycloak.Config;
 import org.keycloak.authentication.authenticators.client.ClientIdAndSecretAuthenticator;
-import org.keycloak.authentication.authenticators.client.JWTClientAuthenticator;
-import org.keycloak.constants.ServiceAccountConstants;
+import org.keycloak.common.constants.ServiceAccountConstants;
 import org.keycloak.events.admin.AdminEvent;
 import org.keycloak.events.Details;
 import org.keycloak.events.Event;
@@ -24,12 +23,10 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
-import org.keycloak.protocol.oidc.OIDCLoginProtocol;
-import org.keycloak.protocol.oidc.OIDCLoginProtocolService;
-import org.keycloak.protocol.oidc.endpoints.AuthorizationEndpoint;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.services.managers.RealmManager;
 import org.keycloak.testsuite.rule.KeycloakRule;
+import org.keycloak.util.TokenUtil;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -156,6 +153,7 @@ public class AssertEvents implements TestRule, EventListenerProviderFactory {
                 .detail(Details.CODE_ID, codeId)
                 .detail(Details.TOKEN_ID, isUUID())
                 .detail(Details.REFRESH_TOKEN_ID, isUUID())
+                .detail(Details.REFRESH_TOKEN_TYPE, TokenUtil.TOKEN_TYPE_REFRESH)
                 .detail(Details.CLIENT_AUTH_METHOD, ClientIdAndSecretAuthenticator.PROVIDER_ID)
                 .session(sessionId);
     }
@@ -164,6 +162,7 @@ public class AssertEvents implements TestRule, EventListenerProviderFactory {
         return expect(EventType.REFRESH_TOKEN)
                 .detail(Details.TOKEN_ID, isUUID())
                 .detail(Details.REFRESH_TOKEN_ID, refreshTokenId)
+                .detail(Details.REFRESH_TOKEN_TYPE, TokenUtil.TOKEN_TYPE_REFRESH)
                 .detail(Details.UPDATED_REFRESH_TOKEN_ID, isUUID())
                 .detail(Details.CLIENT_AUTH_METHOD, ClientIdAndSecretAuthenticator.PROVIDER_ID)
                 .session(sessionId);

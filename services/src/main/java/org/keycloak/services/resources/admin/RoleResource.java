@@ -38,13 +38,14 @@ public abstract class RoleResource {
     protected void updateRole(RoleRepresentation rep, RoleModel role) {
         role.setName(rep.getName());
         role.setDescription(rep.getDescription());
+        if (rep.isScopeParamRequired() != null) role.setScopeParamRequired(rep.isScopeParamRequired());
     }
 
     protected void addComposites(AdminEventBuilder adminEvent, UriInfo uriInfo, List<RoleRepresentation> roles, RoleModel role) {
         for (RoleRepresentation rep : roles) {
             RoleModel composite = realm.getRoleById(rep.getId());
             if (composite == null) {
-                throw new NotFoundException("Could not find composite role: " + rep.getName());
+                throw new NotFoundException("Could not find composite role");
             }
             role.addCompositeRole(composite);
 
@@ -88,7 +89,7 @@ public abstract class RoleResource {
         for (RoleRepresentation rep : roles) {
             RoleModel composite = realm.getRoleById(rep.getId());
             if (composite == null) {
-                throw new NotFoundException("Could not find composite role: " + rep.getName());
+                throw new NotFoundException("Could not find composite role");
             }
             role.removeCompositeRole(composite);
         }

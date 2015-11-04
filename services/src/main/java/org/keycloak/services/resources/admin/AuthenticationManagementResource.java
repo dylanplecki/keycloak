@@ -6,13 +6,10 @@ import org.jboss.resteasy.spi.BadRequestException;
 import org.jboss.resteasy.spi.NotFoundException;
 import org.keycloak.authentication.AuthenticationFlow;
 import org.keycloak.authentication.Authenticator;
-import org.keycloak.authentication.AuthenticatorUtil;
 import org.keycloak.authentication.ClientAuthenticator;
 import org.keycloak.authentication.ClientAuthenticatorFactory;
 import org.keycloak.authentication.ConfigurableAuthenticatorFactory;
-import org.keycloak.authentication.DefaultAuthenticationFlow;
 import org.keycloak.authentication.FormAction;
-import org.keycloak.authentication.FormAuthenticationFlow;
 import org.keycloak.authentication.FormAuthenticator;
 import org.keycloak.authentication.RequiredActionFactory;
 import org.keycloak.authentication.RequiredActionProvider;
@@ -22,10 +19,10 @@ import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RequiredActionProviderModel;
-import org.keycloak.provider.ConfiguredProvider;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.provider.ProviderFactory;
 import org.keycloak.representations.idm.ConfigPropertyRepresentation;
+import org.keycloak.services.ErrorResponse;
 import org.keycloak.utils.CredentialHelper;
 
 import javax.ws.rs.Consumes;
@@ -172,6 +169,11 @@ public class AuthenticationManagementResource {
         }
     }
 
+    /**
+     * Get form providers
+     *
+     * Returns a list of form providers.
+     */
     @Path("/form-providers")
     @GET
     @NoCache
@@ -182,6 +184,11 @@ public class AuthenticationManagementResource {
         return buildProviderMetadata(factories);
     }
 
+    /**
+     * Get authenticator providers
+     *
+     * Returns a list of authenticator providers.
+     */
     @Path("/authenticator-providers")
     @GET
     @NoCache
@@ -192,6 +199,11 @@ public class AuthenticationManagementResource {
         return buildProviderMetadata(factories);
     }
 
+    /**
+     * Get client authenticator providers
+     *
+     * Returns a list of client authenticator providers.
+     */
     @Path("/client-authenticator-providers")
     @GET
     @NoCache
@@ -211,16 +223,16 @@ public class AuthenticationManagementResource {
             data.put("description", configured.getHelpText());
             data.put("displayName", configured.getDisplayType());
 
-            if (configured instanceof ClientAuthenticatorFactory) {
-                ClientAuthenticatorFactory configuredClient = (ClientAuthenticatorFactory) configured;
-                data.put("configurablePerClient", configuredClient.isConfigurablePerClient());
-            }
-
             providers.add(data);
         }
         return providers;
     }
 
+    /**
+     * Get form action providers
+     *
+     * Returns a list of form action providers.
+     */
     @Path("/form-action-providers")
     @GET
     @NoCache
@@ -232,6 +244,11 @@ public class AuthenticationManagementResource {
     }
 
 
+    /**
+     * Get authentication flows
+     *
+     * Returns a list of authentication flows.
+     */
     @Path("/flows")
     @GET
     @NoCache
@@ -247,6 +264,12 @@ public class AuthenticationManagementResource {
         return flows;
     }
 
+    /**
+     * Create a new authentication flow
+     *
+     * @param model Authentication flow model
+     * @return
+     */
     @Path("/flows")
     @POST
     @NoCache
@@ -255,7 +278,7 @@ public class AuthenticationManagementResource {
         this.auth.requireManage();
 
         if (realm.getFlowByAlias(model.getAlias()) != null) {
-            return Response.status(Response.Status.CONFLICT).build();
+            return ErrorResponse.exists("Flow " + model.getAlias() + " already exists");
         }
 
         realm.addAuthenticationFlow(model);
@@ -263,6 +286,12 @@ public class AuthenticationManagementResource {
 
     }
 
+    /**
+     * Get authentication flow for id
+     *
+     * @param id Flow id
+     * @return
+     */
     @Path("/flows/{id}")
     @GET
     @NoCache
@@ -277,6 +306,11 @@ public class AuthenticationManagementResource {
         return flow;
     }
 
+    /**
+     * Delete an authentication flow
+     *
+     * @param id Flow id
+     */
     @Path("/flows/{id}")
     @DELETE
     @NoCache
@@ -290,9 +324,25 @@ public class AuthenticationManagementResource {
         if (flow.isBuiltIn()) {
             throw new BadRequestException("Can't delete built in flow");
         }
+        List<AuthenticationExecutionModel> executions = realm.getAuthenticationExecutions(id);
+        for (AuthenticationExecutionModel execution : executions) {
+        	if(execution.getFlowId() != null) {
+        		AuthenticationFlowModel nonTopLevelFlow = realm.getAuthenticationFlowById(execution.getFlowId());
+        		realm.removeAuthenticationFlow(nonTopLevelFlow);
+        	}
+        	realm.removeAuthenticatorExecution(execution);
+        }
         realm.removeAuthenticationFlow(flow);
     }
 
+    /**
+     * Copy existing authentication flow under a new name
+     *
+     * The new name is given as 'newName' attribute of the passed JSON object
+     *
+     * @param flowAlias Name of the existing authentication flow
+     * @param data JSON containing 'newName' attribute
+     */
     @Path("/flows/{flowAlias}/copy")
     @POST
     @NoCache
@@ -343,6 +393,12 @@ public class AuthenticationManagementResource {
         }
     }
 
+    /**
+     * Add new flow with new execution to existing flow
+     *
+     * @param flowAlias Alias of parent authentication flow
+     * @param data New authentication flow / execution JSON data containing 'alias', 'type', 'provider', and 'description' attributes
+     */
     @Path("/flows/{flowAlias}/executions/flow")
     @POST
     @NoCache
@@ -375,9 +431,22 @@ public class AuthenticationManagementResource {
         execution.setRequirement(AuthenticationExecutionModel.Requirement.DISABLED);
         execution.setAuthenticatorFlow(true);
         execution.setAuthenticator(provider);
+        execution.setPriority(getNextPriority(parentFlow));
+
         realm.addAuthenticatorExecution(execution);
     }
 
+    private int getNextPriority(AuthenticationFlowModel parentFlow) {
+        List<AuthenticationExecutionModel> executions = getSortedExecutions(parentFlow);
+        return executions.isEmpty() ? 0 : executions.get(executions.size() - 1).getPriority() + 1;
+    }
+
+    /**
+     * Add new authentication execution to a flow
+     *
+     * @param flowAlias Alias of parent flow
+     * @param data New execution JSON data containing 'provider' attribute
+     */
     @Path("/flows/{flowAlias}/executions/execution")
     @POST
     @NoCache
@@ -391,17 +460,21 @@ public class AuthenticationManagementResource {
         }
         String provider = data.get("provider");
 
-
         AuthenticationExecutionModel execution = new AuthenticationExecutionModel();
         execution.setParentFlow(parentFlow.getId());
         execution.setRequirement(AuthenticationExecutionModel.Requirement.DISABLED);
         execution.setAuthenticatorFlow(false);
         execution.setAuthenticator(provider);
+        execution.setPriority(getNextPriority(parentFlow));
+
         realm.addAuthenticatorExecution(execution);
     }
 
-
-
+    /**
+     * Get authentication executions for a flow
+     *
+     * @param flowAlias Flow alias
+     */
     @Path("/flows/{flowAlias}/executions")
     @GET
     @NoCache
@@ -472,6 +545,12 @@ public class AuthenticationManagementResource {
         }
     }
 
+    /**
+     * Update authentication executions of a flow
+     *
+     * @param flowAlias Flow alias
+     * @param rep
+     */
     @Path("/flows/{flowAlias}/executions")
     @PUT
     @NoCache
@@ -497,6 +576,11 @@ public class AuthenticationManagementResource {
         }
     }
 
+    /**
+     * Add new authentication execution
+     *
+     * @param model JSON model describing authentication execution
+     */
     @Path("/executions")
     @POST
     @NoCache
@@ -507,13 +591,7 @@ public class AuthenticationManagementResource {
         if (parentFlow.isBuiltIn()) {
             throw new BadRequestException("It is illegal to add execution to a built in flow");
         }
-        int priority = 0;
-        List<AuthenticationExecutionModel> executions = getSortedExecutions(parentFlow);
-        for (AuthenticationExecutionModel execution : executions) {
-            priority = execution.getPriority();
-        }
-        if (priority > 0) priority += 10;
-        model.setPriority(priority);
+        model.setPriority(getNextPriority(parentFlow));
         model = realm.addAuthenticatorExecution(model);
         return Response.created(uriInfo.getAbsolutePathBuilder().path(model.getId()).build()).build();
     }
@@ -530,6 +608,11 @@ public class AuthenticationManagementResource {
         return parentFlow;
     }
 
+    /**
+     * Raise execution's priority
+     *
+     * @param execution Execution id
+     */
     @Path("/executions/{executionId}/raise-priority")
     @POST
     @NoCache
@@ -569,6 +652,11 @@ public class AuthenticationManagementResource {
         return executions;
     }
 
+    /**
+     * Lower execution's priority
+     *
+     * @param execution Execution id
+     */
     @Path("/executions/{executionId}/lower-priority")
     @POST
     @NoCache
@@ -602,6 +690,11 @@ public class AuthenticationManagementResource {
     }
 
 
+    /**
+     * Delete execution
+     *
+     * @param execution Execution id
+     */
     @Path("/executions/{executionId}")
     @DELETE
     @NoCache
@@ -622,9 +715,13 @@ public class AuthenticationManagementResource {
     }
 
 
-
-
-
+    /**
+     * Update execution with new configuration
+     *
+     * @param execution Execution id
+     * @param config JSON with new configuration
+     * @return
+     */
     @Path("/executions/{executionId}/config")
     @POST
     @NoCache
@@ -644,6 +741,12 @@ public class AuthenticationManagementResource {
         return Response.created(uriInfo.getAbsolutePathBuilder().path(config.getId()).build()).build();
     }
 
+    /**
+     * Get execution's configuration
+     *
+     * @param execution Execution id
+     * @param id Configuration id
+     */
     @Path("/executions/{executionId}/config/{id}")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -707,6 +810,11 @@ public class AuthenticationManagementResource {
         }
     }
 
+    /**
+     * Get unregistered required actions
+     *
+     * Returns a list of unregistered required actions.
+     */
     @Path("unregistered-required-actions")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -734,6 +842,11 @@ public class AuthenticationManagementResource {
         return unregisteredList;
     }
 
+    /**
+     * Register a new required actions
+     *
+     * @param data JSON containing 'providerId', and 'name' attributes.
+     */
     @Path("register-required-action")
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
@@ -751,7 +864,11 @@ public class AuthenticationManagementResource {
     }
 
 
-
+    /**
+     * Get required actions
+     *
+     * Returns a list of required actions.
+     */
     @Path("required-actions")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -775,6 +892,10 @@ public class AuthenticationManagementResource {
         return rep;
     }
 
+    /**
+     * Get required action for alias
+     * @param alias Alias of required action
+     */
     @Path("required-actions/{alias}")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -782,12 +903,18 @@ public class AuthenticationManagementResource {
     public RequiredActionProviderRepresentation getRequiredAction(@PathParam("alias") String alias) {
         RequiredActionProviderModel model = realm.getRequiredActionProviderByAlias(alias);
         if (model == null) {
-            throw new NotFoundException("Failed to find required action: " + alias);
+            throw new NotFoundException("Failed to find required action");
         }
         return toRepresentation(model);
     }
 
 
+    /**
+     * Update required action
+     *
+     * @param alias Alias of required action
+     * @param rep JSON describing new state of required action
+     */
     @Path("required-actions/{alias}")
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
@@ -795,7 +922,7 @@ public class AuthenticationManagementResource {
         this.auth.requireManage();
         RequiredActionProviderModel model = realm.getRequiredActionProviderByAlias(alias);
         if (model == null) {
-            throw new NotFoundException("Failed to find required action: " + alias);
+            throw new NotFoundException("Failed to find required action");
         }
         RequiredActionProviderModel update = new RequiredActionProviderModel();
         update.setId(model.getId());
@@ -808,13 +935,17 @@ public class AuthenticationManagementResource {
         realm.updateRequiredActionProvider(update);
     }
 
+    /**
+     * Delete required action
+     * @param alias Alias of required action
+     */
     @Path("required-actions/{alias}")
     @DELETE
     public void updateRequiredAction(@PathParam("alias") String alias) {
         this.auth.requireManage();
         RequiredActionProviderModel model = realm.getRequiredActionProviderByAlias(alias);
         if (model == null) {
-            throw new NotFoundException("Failed to find required action: " + alias);
+            throw new NotFoundException("Failed to find required action.");
         }
         realm.removeRequiredActionProvider(model);
     }
@@ -860,6 +991,9 @@ public class AuthenticationManagementResource {
     }
 
 
+    /**
+     * Get authenticator provider's configuration description
+     */
     @Path("config-description/{providerId}")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -893,24 +1027,39 @@ public class AuthenticationManagementResource {
         return propRep;
     }
 
-
-    @Path("per-client-config-description/{providerId}")
+    /**
+     *  Get configuration descriptions for all clients
+     */
+    @Path("per-client-config-description")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @NoCache
-    public List<ConfigPropertyRepresentation> getPerClientConfigDescription(@PathParam("providerId") String providerId) {
+    public Map<String, List<ConfigPropertyRepresentation>> getPerClientConfigDescription() {
         this.auth.requireView();
-        ConfigurableAuthenticatorFactory factory = CredentialHelper.getConfigurableAuthenticatorFactory(session, providerId);
-        ClientAuthenticatorFactory clientAuthFactory = (ClientAuthenticatorFactory) factory;
-        List<ProviderConfigProperty> perClientConfigProps = clientAuthFactory.getConfigPropertiesPerClient();
-        List<ConfigPropertyRepresentation> result = new LinkedList<>();
-        for (ProviderConfigProperty prop : perClientConfigProps) {
-            ConfigPropertyRepresentation propRep = getConfigPropertyRep(prop);
-            result.add(propRep);
+        List<ProviderFactory> factories = session.getKeycloakSessionFactory().getProviderFactories(ClientAuthenticator.class);
+
+        Map<String, List<ConfigPropertyRepresentation>> toReturn = new HashMap<>();
+        for (ProviderFactory clientAuthenticatorFactory : factories) {
+            String providerId = clientAuthenticatorFactory.getId();
+            ConfigurableAuthenticatorFactory factory = CredentialHelper.getConfigurableAuthenticatorFactory(session, providerId);
+            ClientAuthenticatorFactory clientAuthFactory = (ClientAuthenticatorFactory) factory;
+            List<ProviderConfigProperty> perClientConfigProps = clientAuthFactory.getConfigPropertiesPerClient();
+            List<ConfigPropertyRepresentation> result = new LinkedList<>();
+            for (ProviderConfigProperty prop : perClientConfigProps) {
+                ConfigPropertyRepresentation propRep = getConfigPropertyRep(prop);
+                result.add(propRep);
+            }
+
+            toReturn.put(providerId, result);
         }
-        return result;
+
+        return toReturn;
     }
 
+    /**
+     * Create new authenticator configuration
+     * @param config JSON describing new authenticator configuration
+     */
     @Path("config")
     @POST
     @NoCache
@@ -920,6 +1069,10 @@ public class AuthenticationManagementResource {
         return Response.created(uriInfo.getAbsolutePathBuilder().path(config.getId()).build()).build();
     }
 
+    /**
+     * Get authenticator configuration
+     * @param id Configuration id
+     */
     @Path("config/{id}")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -933,6 +1086,11 @@ public class AuthenticationManagementResource {
         }
         return config;
     }
+
+    /**
+     * Delete authenticator configuration
+     * @param id Configuration id
+     */
     @Path("config/{id}")
     @DELETE
     @NoCache
@@ -955,6 +1113,12 @@ public class AuthenticationManagementResource {
 
         realm.removeAuthenticatorConfig(config);
     }
+
+    /**
+     * Update authenticator configuration
+     * @param id Configuration id
+     * @param config JSON describing new state of authenticator configuration
+     */
     @Path("config/{id}")
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)

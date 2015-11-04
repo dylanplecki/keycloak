@@ -6,8 +6,8 @@ import org.keycloak.Config;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.protocol.oidc.utils.RedirectUtils;
-import org.keycloak.util.StreamUtil;
-import org.keycloak.util.UriUtils;
+import org.keycloak.common.util.StreamUtil;
+import org.keycloak.common.util.UriUtils;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Produces;
@@ -58,7 +58,7 @@ public class LoginStatusIframeEndpoint {
             }
         }
 
-        for (String r : RedirectUtils.resolveValidRedirects(uriInfo, client.getRedirectUris())) {
+        for (String r : RedirectUtils.resolveValidRedirects(uriInfo, client.getRootUrl(), client.getRedirectUris())) {
             int i = r.indexOf('/', 8);
             if (i != -1) {
                 r = r.substring(0, i);

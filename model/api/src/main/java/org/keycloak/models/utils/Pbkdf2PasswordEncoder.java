@@ -1,6 +1,6 @@
 package org.keycloak.models.utils;
 
-import net.iharder.Base64;
+import org.keycloak.common.util.Base64;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -90,14 +90,7 @@ public class Pbkdf2PasswordEncoder {
     public static byte[] getSalt() {
         byte[] buffer = new byte[16];
 
-        SecureRandom secureRandom;
-
-        try {
-            secureRandom = SecureRandom.getInstance(RNG_ALGORITHM);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("RNG algorithm not found");
-        }
-
+        SecureRandom secureRandom = new SecureRandom();
         secureRandom.nextBytes(buffer);
 
         return buffer;

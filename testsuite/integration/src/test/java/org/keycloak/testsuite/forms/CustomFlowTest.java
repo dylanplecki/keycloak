@@ -27,21 +27,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.authentication.AuthenticationFlow;
-import org.keycloak.authentication.authenticators.client.ClientIdAndSecretAuthenticator;
 import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
-import org.keycloak.events.Event;
-import org.keycloak.events.EventType;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
-import org.keycloak.models.BrowserSecurityHeaders;
-import org.keycloak.models.PasswordPolicy;
+import org.keycloak.models.ClientModel;
 import org.keycloak.models.RealmModel;
-import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.RefreshToken;
-import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.services.managers.ClientManager;
 import org.keycloak.services.managers.RealmManager;
 import org.keycloak.testsuite.AssertEvents;
@@ -55,15 +49,8 @@ import org.keycloak.testsuite.pages.RegisterPage;
 import org.keycloak.testsuite.rule.KeycloakRule;
 import org.keycloak.testsuite.rule.WebResource;
 import org.keycloak.testsuite.rule.WebRule;
-import org.keycloak.util.Time;
 import org.openqa.selenium.WebDriver;
 
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.core.Response;
-import java.util.Map;
-
-import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -120,8 +107,6 @@ public class CustomFlowTest {
             execution.setAuthenticatorFlow(false);
             appRealm.addAuthenticatorExecution(execution);
 
-            new ClientManager().createClient(appRealm, "dummy-client");
-
             AuthenticationFlowModel clientFlow = new AuthenticationFlowModel();
             clientFlow.setAlias("client-dummy");
             clientFlow.setDescription("dummy pass through flow");
@@ -138,6 +123,11 @@ public class CustomFlowTest {
             execution.setPriority(10);
             execution.setAuthenticatorFlow(false);
             appRealm.addAuthenticatorExecution(execution);
+
+            // Set passthrough clientAuthenticator for our clients
+            ClientModel dummyClient = new ClientManager().createClient(appRealm, "dummy-client");
+            dummyClient.setClientAuthenticatorType(PassThroughClientAuthenticator.PROVIDER_ID);
+            appRealm.getClientByClientId("test-app").setClientAuthenticatorType(PassThroughClientAuthenticator.PROVIDER_ID);
         }
     });
 
@@ -201,7 +191,7 @@ public class CustomFlowTest {
         PassThroughClientAuthenticator.clientId = "unknown";
         OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest("password", "test-user", "password");
         assertEquals(400, response.getStatusCode());
-        assertEquals("invalid_client", response.getError());
+        assertEquals("unauthorized_client", response.getError());
 
         events.expectLogin()
                 .client((String) null)
@@ -210,7 +200,7 @@ public class CustomFlowTest {
                 .removeDetail(Details.CODE_ID)
                 .removeDetail(Details.REDIRECT_URI)
                 .removeDetail(Details.CONSENT)
-                .error(Errors.CLIENT_NOT_FOUND)
+                .error(Errors.INVALID_CLIENT_CREDENTIALS)
                 .assertEvent();
     }
 

@@ -3,7 +3,7 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
     <name>Keycloak Tomcat Integration</name>
@@ -14,6 +14,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>tomcat-adapter-spi</module>
         <module>tomcat-core</module>
         <module>tomcat6</module>
         <module>tomcat7</module>

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2015 Red Hat Inc. and/or its affiliates and other contributors
+ * as indicated by the @author tags. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.keycloak.account.freemarker;
 
 import java.io.IOException;
@@ -35,7 +51,6 @@ import org.keycloak.events.Event;
 import org.keycloak.freemarker.BrowserSecurityHeaderSetup;
 import org.keycloak.freemarker.FreeMarkerException;
 import org.keycloak.freemarker.FreeMarkerUtil;
-import org.keycloak.freemarker.LocaleHelper;
 import org.keycloak.freemarker.Theme;
 import org.keycloak.freemarker.ThemeProvider;
 import org.keycloak.freemarker.beans.AdvancedMessageFormatterMethod;
@@ -49,7 +64,6 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.models.utils.FormMessage;
-import org.keycloak.services.Urls;
 
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
@@ -114,7 +128,7 @@ public class FreeMarkerAccountProvider implements AccountProvider {
             logger.warn("Failed to load properties", e);
         }
 
-        Locale locale = LocaleHelper.getLocale(realm, user, uriInfo, headers);
+        Locale locale = session.getContext().resolveLocale(user);
         Properties messagesBundle;
         try {
             messagesBundle = theme.getMessages(locale);
@@ -186,7 +200,7 @@ public class FreeMarkerAccountProvider implements AccountProvider {
                 attributes.put("sessions", new SessionsBean(realm, sessions));
                 break;
             case APPLICATIONS:
-                attributes.put("applications", new ApplicationsBean(realm, user));
+                attributes.put("applications", new ApplicationsBean(session, realm, user));
                 attributes.put("advancedMsg", new AdvancedMessageFormatterMethod(locale, messagesBundle));
                 break;
             case PASSWORD:
@@ -197,7 +211,6 @@ public class FreeMarkerAccountProvider implements AccountProvider {
             String result = freeMarker.processTemplate(attributes, Templates.getTemplate(page), theme);
             Response.ResponseBuilder builder = Response.status(status).type(MediaType.TEXT_HTML).entity(result);
             BrowserSecurityHeaderSetup.headers(builder, realm);
-            LocaleHelper.updateLocaleCookie(builder, locale, realm, uriInfo, Urls.localeCookiePath(baseUri,realm.getName()));
             return builder.build();
         } catch (FreeMarkerException e) {
             logger.error("Failed to process template", e);
@@ -209,7 +222,7 @@ public class FreeMarkerAccountProvider implements AccountProvider {
         this.passwordSet = passwordSet;
         return this;
     }
-    
+
     protected void setMessage(MessageType type, String message, Object... parameters) {
         messageType = type;
         messages = new ArrayList<>();
@@ -225,7 +238,7 @@ public class FreeMarkerAccountProvider implements AccountProvider {
             return message.getMessage();
         }
     }
-  
+
     @Override
     public AccountProvider setErrors(List<FormMessage> messages) {
         this.messageType = MessageType.ERROR;

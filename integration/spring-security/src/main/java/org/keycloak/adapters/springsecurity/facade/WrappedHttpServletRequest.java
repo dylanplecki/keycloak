@@ -1,7 +1,7 @@
 package org.keycloak.adapters.springsecurity.facade;
 
-import org.keycloak.adapters.HttpFacade.Cookie;
-import org.keycloak.adapters.HttpFacade.Request;
+import org.keycloak.adapters.spi.HttpFacade.Cookie;
+import org.keycloak.adapters.spi.HttpFacade.Request;
 import org.springframework.util.Assert;
 
 import javax.servlet.http.HttpServletRequest;
@@ -33,6 +33,11 @@ class WrappedHttpServletRequest implements Request {
     }
 
     @Override
+    public String getFirstParam(String param) {
+        return request.getParameter(param);
+    }
+
+    @Override
     public String getMethod() {
         return request.getMethod();
     }
@@ -58,6 +63,12 @@ class WrappedHttpServletRequest implements Request {
 
     @Override
     public Cookie getCookie(String cookieName) {
+
+        javax.servlet.http.Cookie[] cookies = request.getCookies();
+
+        if (cookies == null) {
+            return null;
+        }
 
         for (javax.servlet.http.Cookie cookie : request.getCookies()) {
             if (cookie.getName().equals(cookieName)) {

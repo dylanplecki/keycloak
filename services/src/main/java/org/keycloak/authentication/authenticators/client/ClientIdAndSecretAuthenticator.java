@@ -1,25 +1,24 @@
 package org.keycloak.authentication.authenticators.client;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 
 import org.jboss.logging.Logger;
 import org.keycloak.OAuth2Constants;
-import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.ClientAuthenticationFlowContext;
-import org.keycloak.events.Details;
-import org.keycloak.events.Errors;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.RealmModel;
 import org.keycloak.provider.ProviderConfigProperty;
+import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.util.BasicAuthHelper;
 
 /**
@@ -36,7 +35,6 @@ public class ClientIdAndSecretAuthenticator extends AbstractClientAuthenticator 
     public static final String PROVIDER_ID = "client-secret";
 
     public static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
-            AuthenticationExecutionModel.Requirement.REQUIRED,
             AuthenticationExecutionModel.Requirement.ALTERNATIVE,
             AuthenticationExecutionModel.Requirement.DISABLED
     };
@@ -47,7 +45,11 @@ public class ClientIdAndSecretAuthenticator extends AbstractClientAuthenticator 
         String clientSecret = null;
 
         String authorizationHeader = context.getHttpRequest().getHttpHeaders().getRequestHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
+
+        MediaType mediaType = context.getHttpRequest().getHttpHeaders().getMediaType();
+        boolean hasFormData = mediaType != null && mediaType.isCompatible(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+
+        MultivaluedMap<String, String> formData = hasFormData ? context.getHttpRequest().getDecodedFormParameters() : null;
 
         if (authorizationHeader != null) {
             String[] usernameSecret = BasicAuthHelper.parseHeader(authorizationHeader);
@@ -57,7 +59,7 @@ public class ClientIdAndSecretAuthenticator extends AbstractClientAuthenticator 
             } else {
 
                 // Don't send 401 if client_id parameter was sent in request. For example IE may automatically send "Authorization: Negotiate" in XHR requests even for public clients
-                if (!formData.containsKey(OAuth2Constants.CLIENT_ID)) {
+                if (formData != null && !formData.containsKey(OAuth2Constants.CLIENT_ID)) {
                     Response challengeResponse = Response.status(Response.Status.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + context.getRealm().getName() + "\"").build();
                     context.challenge(challengeResponse);
                     return;
@@ -65,7 +67,7 @@ public class ClientIdAndSecretAuthenticator extends AbstractClientAuthenticator 
             }
         }
 
-        if (client_id == null) {
+        if (formData != null && client_id == null) {
             client_id = formData.getFirst(OAuth2Constants.CLIENT_ID);
             clientSecret = formData.getFirst("client_secret");
         }
@@ -84,12 +86,12 @@ public class ClientIdAndSecretAuthenticator extends AbstractClientAuthenticator 
             return;
         }
 
+        context.setClient(client);
+
         if (!client.isEnabled()) {
             context.failure(AuthenticationFlowError.CLIENT_DISABLED, null);
             return;
         }
-
-        context.setClient(client);
 
         // Skip client_secret validation for public client
         if (client.isPublicClient()) {
@@ -104,8 +106,8 @@ public class ClientIdAndSecretAuthenticator extends AbstractClientAuthenticator 
         }
 
         if (client.getSecret() == null) {
-            Response challengeResponse = ClientAuthUtil.errorResponse(Response.Status.BAD_REQUEST.getStatusCode(), "unauthorized_client", "Client secret setup required for client " + client.getClientId());
-            context.challenge(challengeResponse);
+            Response challengeResponse = ClientAuthUtil.errorResponse(Response.Status.BAD_REQUEST.getStatusCode(), "unauthorized_client", "Invalid client secret");
+            context.failure(AuthenticationFlowError.INVALID_CLIENT_CREDENTIALS, challengeResponse);
             return;
         }
 
@@ -129,21 +131,6 @@ public class ClientIdAndSecretAuthenticator extends AbstractClientAuthenticator 
     }
 
     @Override
-    public boolean isConfigurablePerClient() {
-        return true;
-    }
-
-    @Override
-    public boolean requiresClient() {
-        return false;
-    }
-
-    @Override
-    public boolean configuredFor(KeycloakSession session, RealmModel realm, ClientModel client) {
-        return client.getSecret() != null;
-    }
-
-    @Override
     public AuthenticationExecutionModel.Requirement[] getRequirementChoices() {
         return REQUIREMENT_CHOICES;
     }
@@ -160,8 +147,15 @@ public class ClientIdAndSecretAuthenticator extends AbstractClientAuthenticator 
 
     @Override
     public List<ProviderConfigProperty> getConfigPropertiesPerClient() {
-        // This impl doesn't use generic screen in admin console, but has it's own screen. So no need to return anything here
+        // This impl doesn't use generic screen in admin console, but has its own screen. So no need to return anything here
         return Collections.emptyList();
+    }
+
+    @Override
+    public Map<String, Object> getAdapterConfiguration(ClientModel client) {
+        Map<String, Object> result = new HashMap<>();
+        result.put(CredentialRepresentation.SECRET, client.getSecret());
+        return result;
     }
 
     @Override

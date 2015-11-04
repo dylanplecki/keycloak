@@ -46,7 +46,6 @@ import org.keycloak.models.UserSessionModel;
 import org.keycloak.models.utils.CredentialValidation;
 import org.keycloak.models.utils.FormMessage;
 import org.keycloak.models.utils.ModelToRepresentation;
-import org.keycloak.models.utils.TimeBasedOTP;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.utils.RedirectUtils;
 import org.keycloak.representations.idm.CredentialRepresentation;
@@ -57,10 +56,11 @@ import org.keycloak.services.managers.AppAuthManager;
 import org.keycloak.services.managers.Auth;
 import org.keycloak.services.managers.AuthenticationManager;
 import org.keycloak.services.managers.ClientSessionCode;
+import org.keycloak.services.managers.UserSessionManager;
 import org.keycloak.services.messages.Messages;
 import org.keycloak.services.util.ResolveRelative;
 import org.keycloak.services.validation.Validation;
-import org.keycloak.util.UriUtils;
+import org.keycloak.common.util.UriUtils;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -486,6 +486,7 @@ public class AccountService extends AbstractSecuredLocalService {
         // Revoke grant in UserModel
         UserModel user = auth.getUser();
         user.revokeConsentForClient(client.getId());
+        new UserSessionManager(session).revokeOfflineToken(user, client);
 
         // Logout clientSessions for this user and client
         AuthenticationManager.backchannelUserFromClient(session, realm, user, client, uriInfo, headers);
@@ -778,7 +779,7 @@ public class AccountService extends AbstractSecuredLocalService {
             if (referrerUri != null) {
                 referrerUri = RedirectUtils.verifyRedirectUri(uriInfo, referrerUri, realm, referrerClient);
             } else {
-                referrerUri = ResolveRelative.resolveRelativeUri(uriInfo.getRequestUri(), referrerClient.getBaseUrl());
+                referrerUri = ResolveRelative.resolveRelativeUri(uriInfo.getRequestUri(), client.getRootUrl(), referrerClient.getBaseUrl());
             }
 
             if (referrerUri != null) {

@@ -16,10 +16,10 @@ import org.keycloak.representations.adapters.action.LogoutAction;
 import org.keycloak.representations.adapters.action.PushNotBeforeAction;
 import org.keycloak.representations.adapters.action.TestAvailabilityAction;
 import org.keycloak.services.util.ResolveRelative;
-import org.keycloak.util.KeycloakUriBuilder;
-import org.keycloak.util.MultivaluedHashMap;
-import org.keycloak.util.StringPropertyReplacer;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.KeycloakUriBuilder;
+import org.keycloak.common.util.MultivaluedHashMap;
+import org.keycloak.common.util.StringPropertyReplacer;
+import org.keycloak.common.util.Time;
 
 import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
@@ -46,8 +46,8 @@ public class ResourceAdminManager {
         this.session = session;
     }
 
-    public static String resolveUri(URI requestUri, String uri) {
-        String absoluteURI = ResolveRelative.resolveRelativeUri(requestUri, uri);
+    public static String resolveUri(URI requestUri, String rootUrl, String uri) {
+        String absoluteURI = ResolveRelative.resolveRelativeUri(requestUri, rootUrl, uri);
         return StringPropertyReplacer.replaceProperties(absoluteURI);
 
    }
@@ -58,8 +58,7 @@ public class ResourceAdminManager {
             return null;
         }
 
-        // this is to support relative admin urls when keycloak and clients are deployed on the same machine
-        String absoluteURI = ResolveRelative.resolveRelativeUri(requestUri, mgmtUrl);
+        String absoluteURI = ResolveRelative.resolveRelativeUri(requestUri, client.getRootUrl(), mgmtUrl);
 
         // this is for resolving URI like "http://${jboss.host.name}:8080/..." in order to send request to same machine and avoid request to LB in cluster environment
         return StringPropertyReplacer.replaceProperties(absoluteURI);
@@ -281,7 +280,7 @@ public class ResourceAdminManager {
     protected boolean sendPushRevocationPolicyRequest(RealmModel realm, ClientModel resource, int notBefore, String managementUrl) {
         PushNotBeforeAction adminAction = new PushNotBeforeAction(TokenIdGenerator.generateId(), Time.currentTime() + 30, resource.getClientId(), notBefore);
         String token = new TokenManager().encodeToken(realm, adminAction);
-        logger.infov("pushRevocation resource: {0} url: {1}", resource.getClientId(), managementUrl);
+        logger.debugv("pushRevocation resource: {0} url: {1}", resource.getClientId(), managementUrl);
         URI target = UriBuilder.fromUri(managementUrl).path(AdapterConstants.K_PUSH_NOT_BEFORE).build();
         try {
             int status = session.getProvider(HttpClientProvider.class).postText(target.toString(), token);

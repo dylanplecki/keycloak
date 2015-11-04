@@ -18,7 +18,9 @@
         <module name="org.jboss.as.security"/>
         <module name="org.jboss.as.web"/>
         <module name="org.picketbox"/>
+        <module name="org.keycloak.keycloak-adapter-spi"/>
         <module name="org.keycloak.keycloak-adapter-core"/>
+        <module name="org.keycloak.keycloak-common"/>
         <module name="org.keycloak.keycloak-core"/>
     </dependencies>
 

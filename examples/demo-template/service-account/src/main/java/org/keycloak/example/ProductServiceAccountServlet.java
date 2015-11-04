@@ -24,7 +24,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.RSATokenVerifier;
-import org.keycloak.VerificationException;
+import org.keycloak.common.VerificationException;
 import org.keycloak.adapters.KeycloakDeployment;
 import org.keycloak.adapters.KeycloakDeploymentBuilder;
 import org.keycloak.adapters.ServerRequest;
@@ -32,6 +32,7 @@ import org.keycloak.adapters.authentication.ClientCredentialsProviderUtils;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.AccessTokenResponse;
 import org.keycloak.util.JsonSerialization;
+import org.keycloak.common.util.UriUtils;
 
 /**
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
@@ -155,7 +156,8 @@ public abstract class ProductServiceAccountServlet extends HttpServlet {
         HttpClient client = getHttpClient();
         String token = (String) req.getSession().getAttribute(TOKEN);
 
-        HttpGet get = new HttpGet("http://localhost:8080/database/products");
+        String requestOrigin = UriUtils.getOrigin(req.getRequestURL().toString());
+        HttpGet get = new HttpGet(requestOrigin + "/database/products");
         if (token != null) {
             get.addHeader("Authorization", "Bearer " + token);
         }
@@ -165,7 +167,7 @@ public abstract class ProductServiceAccountServlet extends HttpServlet {
             int status = response.getStatusLine().getStatusCode();
             if (status != 200) {
                 String json = getContent(entity);
-                String error = "Failed retrieve products. Status: " + status + ", Response: " + json;
+                String error = "Failed retrieve products. Status: " + status;
                 req.setAttribute(ERROR, error);
             } else if (entity == null) {
                 req.setAttribute(ERROR, "No entity");

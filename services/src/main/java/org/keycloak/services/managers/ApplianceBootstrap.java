@@ -2,7 +2,7 @@ package org.keycloak.services.managers;
 
 import org.jboss.logging.Logger;
 import org.keycloak.Config;
-import org.keycloak.enums.SslRequired;
+import org.keycloak.common.enums.SslRequired;
 import org.keycloak.models.AdminRoles;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.Constants;
@@ -52,6 +52,7 @@ public class ApplianceBootstrap {
         realm.setSsoSessionIdleTimeout(1800);
         realm.setAccessTokenLifespan(60);
         realm.setSsoSessionMaxLifespan(36000);
+        realm.setOfflineSessionIdleTimeout(Constants.DEFAULT_OFFLINE_SESSION_IDLE_TIMEOUT);
         realm.setAccessCodeLifespan(60);
         realm.setAccessCodeLifespanUserAction(300);
         realm.setAccessCodeLifespanLogin(1800);

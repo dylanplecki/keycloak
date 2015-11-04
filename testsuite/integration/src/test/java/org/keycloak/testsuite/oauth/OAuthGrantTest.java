@@ -26,7 +26,7 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.keycloak.OAuth2Constants;
-import org.keycloak.constants.KerberosConstants;
+import org.keycloak.common.constants.KerberosConstants;
 import org.keycloak.events.Details;
 import org.keycloak.events.Event;
 import org.keycloak.events.EventType;
@@ -36,7 +36,6 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
-import org.keycloak.protocol.oidc.OIDCLoginProtocolFactory;
 import org.keycloak.protocol.oidc.mappers.UserSessionNoteMapper;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.services.managers.RealmManager;
@@ -49,9 +48,9 @@ import org.keycloak.testsuite.pages.OAuthGrantPage;
 import org.keycloak.testsuite.rule.KeycloakRule;
 import org.keycloak.testsuite.rule.WebResource;
 import org.keycloak.testsuite.rule.WebRule;
+import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 
-import java.io.IOException;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -130,10 +129,15 @@ public class OAuthGrantTest {
         events.expectCodeToToken(codeId, loginEvent.getSessionId()).client("third-party").assertEvent();
 
         accountAppsPage.open();
+
+        assertEquals(1, driver.findElements(By.id("revoke-third-party")).size());
+
         accountAppsPage.revokeGrant("third-party");
 
         events.expect(EventType.REVOKE_GRANT)
                 .client("account").detail(Details.REVOKED_CLIENT, "third-party").assertEvent();
+
+        assertEquals(0, driver.findElements(By.id("revoke-third-party")).size());
     }
 
     @Test
@@ -282,6 +286,73 @@ public class OAuthGrantTest {
             }
 
         });
+    }
+
+    @Test
+    public void oauthGrantScopeParamRequired() throws Exception {
+        keycloakRule.update(new KeycloakRule.KeycloakSetup() {
+
+            @Override
+            public void config(RealmManager manager, RealmModel adminstrationRealm, RealmModel appRealm) {
+                ClientModel thirdParty = appRealm.getClientByClientId("third-party");
+                RoleModel barAppRole = thirdParty.addRole("bar-role");
+                barAppRole.setScopeParamRequired(true);
+
+                RoleModel fooRole = appRealm.addRole("foo-role");
+                fooRole.setScopeParamRequired(true);
+                thirdParty.addScopeMapping(fooRole);
+
+                UserModel testUser = manager.getSession().users().getUserByUsername("test-user@localhost", appRealm);
+                testUser.grantRole(fooRole);
+                testUser.grantRole(barAppRole);
+            }
+
+        });
+
+        // Assert roles not on grant screen when not requested
+        oauth.clientId("third-party");
+        oauth.doLoginGrant("test-user@localhost", "password");
+        grantPage.assertCurrent();
+        Assert.assertFalse(driver.getPageSource().contains("foo-role"));
+        Assert.assertFalse(driver.getPageSource().contains("bar-role"));
+        grantPage.cancel();
+
+        events.expectLogin()
+                .client("third-party")
+                .error("rejected_by_user")
+                .removeDetail(Details.CONSENT)
+                .assertEvent();
+
+        oauth.scope("foo-role third-party/bar-role");
+        oauth.doLoginGrant("test-user@localhost", "password");
+        grantPage.assertCurrent();
+        Assert.assertTrue(driver.getPageSource().contains("foo-role"));
+        Assert.assertTrue(driver.getPageSource().contains("bar-role"));
+        grantPage.accept();
+
+        events.expectLogin()
+                .client("third-party")
+                .detail(Details.CONSENT, Details.CONSENT_VALUE_CONSENT_GRANTED)
+                .assertEvent();
+
+        // Revoke
+        accountAppsPage.open();
+        accountAppsPage.revokeGrant("third-party");
+        events.expect(EventType.REVOKE_GRANT)
+                .client("account").detail(Details.REVOKED_CLIENT, "third-party").assertEvent();
+
+        // cleanup
+        keycloakRule.update(new KeycloakRule.KeycloakSetup() {
+
+            @Override
+            public void config(RealmManager manager, RealmModel adminstrationRealm, RealmModel appRealm) {
+                appRealm.removeRole(appRealm.getRole("foo-role"));
+                ClientModel thirdparty = appRealm.getClientByClientId("third-party");
+                thirdparty.removeRole(thirdparty.getRole("bar-role"));
+            }
+
+        });
+
     }
 
 }

@@ -1,7 +1,7 @@
 package org.keycloak.models.cache.infinispan;
 
 import org.keycloak.Config;
-import org.keycloak.enums.SslRequired;
+import org.keycloak.common.enums.SslRequired;
 import org.keycloak.models.*;
 import org.keycloak.models.cache.CacheRealmProvider;
 import org.keycloak.models.cache.RealmCache;
@@ -240,6 +240,18 @@ public class RealmAdapter implements RealmModel {
     }
 
     @Override
+    public boolean isRevokeRefreshToken() {
+        if (updated != null) return updated.isRevokeRefreshToken();
+        return cached.isRevokeRefreshToken();
+    }
+
+    @Override
+    public void setRevokeRefreshToken(boolean revokeRefreshToken) {
+        getDelegateForUpdate();
+        updated.setRevokeRefreshToken(revokeRefreshToken);
+    }
+
+    @Override
     public int getSsoSessionIdleTimeout() {
         if (updated != null) return updated.getSsoSessionIdleTimeout();
         return cached.getSsoSessionIdleTimeout();
@@ -261,6 +273,19 @@ public class RealmAdapter implements RealmModel {
     public void setSsoSessionMaxLifespan(int seconds) {
         getDelegateForUpdate();
         updated.setSsoSessionMaxLifespan(seconds);
+    }
+
+    @Override
+    public int getOfflineSessionIdleTimeout() {
+        if (updated != null) return updated.getOfflineSessionIdleTimeout();
+        return cached.getOfflineSessionIdleTimeout();
+    }
+
+
+    @Override
+    public void setOfflineSessionIdleTimeout(int seconds) {
+        getDelegateForUpdate();
+        updated.setOfflineSessionIdleTimeout(seconds);
     }
 
     @Override

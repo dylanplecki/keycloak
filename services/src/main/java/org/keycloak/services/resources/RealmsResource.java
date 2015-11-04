@@ -3,7 +3,7 @@ package org.keycloak.services.resources;
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.spi.NotFoundException;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.Constants;
@@ -13,6 +13,7 @@ import org.keycloak.protocol.LoginProtocol;
 import org.keycloak.protocol.LoginProtocolFactory;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.OIDCLoginProtocolService;
+import org.keycloak.services.clientregistration.ClientRegistrationService;
 import org.keycloak.services.managers.AuthenticationManager;
 import org.keycloak.services.managers.BruteForceProtector;
 import org.keycloak.services.managers.RealmManager;
@@ -108,6 +109,15 @@ public class RealmsResource {
         EventBuilder event = new EventBuilder(realm, session, clientConnection);
         AuthenticationManager authManager = new AuthenticationManager(protector);
         LoginActionsService service = new LoginActionsService(realm, authManager, event);
+        ResteasyProviderFactory.getInstance().injectProperties(service);
+        return service;
+    }
+
+    @Path("{realm}/client-registration")
+    public ClientRegistrationService getClientsService(final @PathParam("realm") String name) {
+        RealmModel realm = init(name);
+        EventBuilder event = new EventBuilder(realm, session, clientConnection);
+        ClientRegistrationService service = new ClientRegistrationService(realm, event);
         ResteasyProviderFactory.getInstance().injectProperties(service);
         return service;
     }

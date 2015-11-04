@@ -9,8 +9,8 @@
             <module name="org.keycloak.keycloak-connections-mongo" services="import"/>
             <module name="org.keycloak.keycloak-connections-mongo-update" services="import"/>
             <module name="org.keycloak.keycloak-connections-file" services="import"/>
+            <module name="org.keycloak.keycloak-common" services="import"/>
             <module name="org.keycloak.keycloak-core" services="import"/>
-            <module name="org.keycloak.keycloak-core-jaxrs" services="import"/>
             <module name="org.keycloak.keycloak-email-api" services="import"/>
             <module name="org.keycloak.keycloak-email-freemarker" services="import"/>
             <module name="org.keycloak.keycloak-events-api" services="import"/>
@@ -21,7 +21,6 @@
             <module name="org.keycloak.keycloak-export-import-api" services="import"/>
             <module name="org.keycloak.keycloak-export-import-dir" services="import"/>
             <module name="org.keycloak.keycloak-export-import-single-file" services="import"/>
-            <module name="org.keycloak.keycloak-export-import-zip" services="import"/>
             <module name="org.keycloak.keycloak-forms-common-freemarker" services="import"/>
             <module name="org.keycloak.keycloak-forms-common-themes" services="import"/>
             <module name="org.keycloak.keycloak-invalidation-cache-infinispan" services="import"/>
@@ -55,11 +54,15 @@
             <module name="org.jboss.resteasy.resteasy-jaxrs"/>
 
             <module name="org.jboss.msc"/>
+
+            <!-- suppress unsupported dependency 'org.infinispan:main' warning -->
+            <module name="org.keycloak.keycloak-server-subsystem.infinispan"/>
         </dependencies>
         <exclusions>
             <module name="org.jboss.resteasy.resteasy-jackson2-provider"/>
 
             <!-- Exclude keycloak modules -->
+            <module name="org.keycloak.keycloak-common" />
             <module name="org.keycloak.keycloak-core" />
         </exclusions>
         <exclude-subsystems>

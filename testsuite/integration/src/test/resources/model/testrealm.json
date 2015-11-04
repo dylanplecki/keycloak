@@ -4,6 +4,7 @@
     "accessTokenLifespan": 6000,
     "accessCodeLifespan": 30,
     "accessCodeLifespanUserAction": 600,
+    "offlineSessionIdleTimeout": 3600000,
     "requiredCredentials": [ "password" ],
     "defaultRoles": [ "foo", "bar" ],
     "verifyEmail" : "true",
@@ -164,6 +165,7 @@
             "name": "Other Application",
             "enabled": true,
             "serviceAccountsEnabled": true,
+            "clientAuthenticatorType": "client-jwt",
             "protocolMappers" : [
                 {
                     "name" : "gss delegation credential",
@@ -197,7 +199,8 @@
         "application" : {
             "Application" : [
                 {
-                    "name": "app-admin"
+                    "name": "app-admin",
+                    "scopeParamRequired": true
                 },
                 {
                     "name": "app-user"
@@ -205,7 +208,8 @@
             ],
             "OtherApp" : [
                 {
-                    "name": "otherapp-admin"
+                    "name": "otherapp-admin",
+                    "scopeParamRequired": false
                 },
                 {
                     "name": "otherapp-user"

@@ -11,10 +11,13 @@ public class ClientRepresentation {
     protected String id;
     protected String clientId;
     protected String name;
+    protected String description;
+    protected String rootUrl;
     protected String adminUrl;
     protected String baseUrl;
     protected Boolean surrogateAuthRequired;
     protected Boolean enabled;
+    protected String clientAuthenticatorType;
     protected String secret;
     protected String[] defaultRoles;
     protected List<String> redirectUris;
@@ -49,6 +52,14 @@ public class ClientRepresentation {
         this.name = name;
     }
 
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     public String getClientId() {
         return clientId;
     }
@@ -73,6 +84,14 @@ public class ClientRepresentation {
         this.surrogateAuthRequired = surrogateAuthRequired;
     }
 
+    public String getRootUrl() {
+        return rootUrl;
+    }
+
+    public void setRootUrl(String rootUrl) {
+        this.rootUrl = rootUrl;
+    }
+
     public String getAdminUrl() {
         return adminUrl;
     }
@@ -87,6 +106,14 @@ public class ClientRepresentation {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
+    }
+
+    public String getClientAuthenticatorType() {
+        return clientAuthenticatorType;
+    }
+
+    public void setClientAuthenticatorType(String clientAuthenticatorType) {
+        this.clientAuthenticatorType = clientAuthenticatorType;
     }
 
     public String getSecret() {

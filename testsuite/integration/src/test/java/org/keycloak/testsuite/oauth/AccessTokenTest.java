@@ -32,9 +32,8 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.keycloak.OAuth2Constants;
-import org.keycloak.VerificationException;
-import org.keycloak.constants.AdapterConstants;
-import org.keycloak.enums.SslRequired;
+import org.keycloak.common.VerificationException;
+import org.keycloak.common.enums.SslRequired;
 import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
 import org.keycloak.events.Event;
@@ -63,7 +62,7 @@ import org.keycloak.testsuite.rule.KeycloakRule;
 import org.keycloak.testsuite.rule.WebResource;
 import org.keycloak.testsuite.rule.WebRule;
 import org.keycloak.util.BasicAuthHelper;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Time;
 import org.openqa.selenium.WebDriver;
 
 import javax.ws.rs.client.Client;
@@ -76,7 +75,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -165,6 +163,21 @@ public class AccessTokenTest {
     }
 
     @Test
+    public void accessTokenMissingClientCredentials() throws Exception {
+        oauth.doLogin("test-user@localhost", "password");
+
+        Event loginEvent = events.expectLogin().assertEvent();
+        String codeId = loginEvent.getDetails().get(Details.CODE_ID);
+
+        String code = oauth.getCurrentQuery().get(OAuth2Constants.CODE);
+        AccessTokenResponse response = oauth.doAccessTokenRequest(code, null);
+        Assert.assertEquals(400, response.getStatusCode());
+
+        AssertEvents.ExpectedEvent expectedEvent = events.expectCodeToToken(codeId, loginEvent.getSessionId()).error("invalid_client_credentials").clearDetails().user((String) null).session((String) null);
+        expectedEvent.assertEvent();
+    }
+
+    @Test
     public void accessTokenInvalidRedirectUri() throws Exception {
         oauth.doLogin("test-user@localhost", "password");
 
@@ -180,7 +193,11 @@ public class AccessTokenTest {
         Assert.assertEquals("invalid_grant", response.getError());
         Assert.assertEquals("Incorrect redirect_uri", response.getErrorDescription());
 
-        events.expectCodeToToken(codeId, loginEvent.getSessionId()).error("invalid_code").removeDetail(Details.TOKEN_ID).removeDetail(Details.REFRESH_TOKEN_ID).assertEvent();
+        events.expectCodeToToken(codeId, loginEvent.getSessionId()).error("invalid_code")
+                .removeDetail(Details.TOKEN_ID)
+                .removeDetail(Details.REFRESH_TOKEN_ID)
+                .removeDetail(Details.REFRESH_TOKEN_TYPE)
+                .assertEvent();
     }
 
     @Test
@@ -201,7 +218,13 @@ public class AccessTokenTest {
         assertNull(tokenResponse.getAccessToken());
         assertNull(tokenResponse.getRefreshToken());
 
-        events.expectCodeToToken(codeId, sessionId).removeDetail(Details.TOKEN_ID).user((String) null).session((String) null).removeDetail(Details.REFRESH_TOKEN_ID).error(Errors.INVALID_CODE).assertEvent();
+        events.expectCodeToToken(codeId, sessionId)
+                .removeDetail(Details.TOKEN_ID)
+                .user((String) null)
+                .session((String) null)
+                .removeDetail(Details.REFRESH_TOKEN_ID)
+                .removeDetail(Details.REFRESH_TOKEN_TYPE)
+                .error(Errors.INVALID_CODE).assertEvent();
 
         events.clear();
     }
@@ -230,7 +253,11 @@ public class AccessTokenTest {
         Assert.assertEquals(400, response.getStatusCode());
 
         AssertEvents.ExpectedEvent expectedEvent = events.expectCodeToToken(codeId, null);
-        expectedEvent.error("invalid_code").removeDetail(Details.TOKEN_ID).removeDetail(Details.REFRESH_TOKEN_ID).user((String) null);
+        expectedEvent.error("invalid_code")
+                .removeDetail(Details.TOKEN_ID)
+                .removeDetail(Details.REFRESH_TOKEN_ID)
+                .removeDetail(Details.REFRESH_TOKEN_TYPE)
+                .user((String) null);
         expectedEvent.assertEvent();
 
         events.clear();
@@ -264,7 +291,11 @@ public class AccessTokenTest {
         Assert.assertEquals(400, response.getStatusCode());
 
         AssertEvents.ExpectedEvent expectedEvent = events.expectCodeToToken(codeId, null);
-        expectedEvent.error("invalid_code").removeDetail(Details.TOKEN_ID).removeDetail(Details.REFRESH_TOKEN_ID).user((String) null);
+        expectedEvent.error("invalid_code")
+                .removeDetail(Details.TOKEN_ID)
+                .removeDetail(Details.REFRESH_TOKEN_ID)
+                .removeDetail(Details.REFRESH_TOKEN_TYPE)
+                .user((String) null);
         expectedEvent.assertEvent();
 
         events.clear();

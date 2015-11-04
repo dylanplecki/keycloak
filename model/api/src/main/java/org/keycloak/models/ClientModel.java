@@ -28,6 +28,10 @@ public interface ClientModel extends RoleContainerModel {
 
     void setName(String name);
 
+    String getDescription();
+
+    void setDescription(String description);
+
     boolean isEnabled();
 
     void setEnabled(boolean enabled);
@@ -56,6 +60,10 @@ public interface ClientModel extends RoleContainerModel {
 
     void setManagementUrl(String url);
 
+    String getRootUrl();
+
+    void setRootUrl(String url);
+
     String getBaseUrl();
 
     void setBaseUrl(String url);
@@ -74,6 +82,9 @@ public interface ClientModel extends RoleContainerModel {
     int getNodeReRegistrationTimeout();
 
     void setNodeReRegistrationTimeout(int timeout);
+
+    String getClientAuthenticatorType();
+    void setClientAuthenticatorType(String clientAuthenticatorType);
 
     boolean validateSecret(String secret);
     String getSecret();

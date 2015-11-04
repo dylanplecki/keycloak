@@ -5,9 +5,8 @@ import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
-import org.keycloak.models.UserModel.RequiredAction;
-import org.keycloak.util.Base64Url;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Base64Url;
+import org.keycloak.common.util.Time;
 
 import javax.crypto.Mac;
 import java.security.Key;
@@ -73,8 +72,12 @@ public class ClientSessionCode {
     }
 
     public static ParseResult parseResult(String code, KeycloakSession session, RealmModel realm) {
+        ParseResult result = new ParseResult();
+        if (code == null) {
+            result.illegalHash = true;
+            return result;
+        }
         try {
-            ParseResult result = new ParseResult();
             String[] parts = code.split("\\.");
             String id = parts[1];
 
@@ -93,7 +96,8 @@ public class ClientSessionCode {
             result.code = new ClientSessionCode(realm, clientSession);
             return result;
         } catch (RuntimeException e) {
-            return null;
+            result.illegalHash = true;
+            return result;
         }
     }
 

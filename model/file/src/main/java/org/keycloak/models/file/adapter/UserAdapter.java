@@ -36,7 +36,7 @@ import org.keycloak.models.entities.RoleEntity;
 import org.keycloak.models.entities.UserEntity;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.models.utils.Pbkdf2PasswordEncoder;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Time;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,8 +46,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import static org.keycloak.models.utils.Pbkdf2PasswordEncoder.getSalt;
 
 /**
  * UserModel for JSON persistence.
@@ -216,7 +214,7 @@ public class UserAdapter implements UserModel, Comparable {
 
     @Override
     public Map<String, List<String>> getAttributes() {
-        return user.getAttributes()==null ? Collections.<String, List<String>>emptyMap() : Collections.unmodifiableMap((Map)user.getAttributes());
+        return user.getAttributes()==null ? Collections.<String, List<String>>emptyMap() : Collections.unmodifiableMap((Map) user.getAttributes());
     }
 
     @Override
@@ -567,6 +565,7 @@ public class UserAdapter implements UserModel, Comparable {
         // TODO
         return false;
     }
+
 
     @Override
     public boolean equals(Object o) {

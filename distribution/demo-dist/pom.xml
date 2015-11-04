@@ -4,7 +4,7 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -22,6 +22,11 @@
         <dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-wf9-adapter-dist</artifactId>
+            <type>zip</type>
+        </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-saml-wf9-adapter-dist</artifactId>
             <type>zip</type>
         </dependency>
         <dependency>
@@ -97,6 +102,23 @@
                                     <artifactId>keycloak-wf9-adapter-dist</artifactId>
                                     <type>zip</type>
                                     <outputDirectory>${project.build.directory}/unpacked/keycloak-wf9-adapter-${project.version}</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>unpack-saml-adapter</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.keycloak</groupId>
+                                    <artifactId>keycloak-saml-wf9-adapter-dist</artifactId>
+                                    <type>zip</type>
+                                    <outputDirectory>${project.build.directory}/unpacked/keycloak-saml-wf9-adapter-${project.version}</outputDirectory>
                                 </artifactItem>
                             </artifactItems>
                         </configuration>

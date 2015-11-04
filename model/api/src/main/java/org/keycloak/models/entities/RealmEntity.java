@@ -39,8 +39,10 @@ public class RealmEntity extends AbstractIdentifiableEntity {
     private int failureFactor;
     //--- end brute force settings
 
+    private boolean revokeRefreshToken;
     private int ssoSessionIdleTimeout;
     private int ssoSessionMaxLifespan;
+    private int offlineSessionIdleTimeout;
     private int accessTokenLifespan;
     private int accessCodeLifespan;
     private int accessCodeLifespanUserAction;
@@ -229,6 +231,14 @@ public class RealmEntity extends AbstractIdentifiableEntity {
         this.failureFactor = failureFactor;
     }
 
+    public boolean isRevokeRefreshToken() {
+        return revokeRefreshToken;
+    }
+
+    public void setRevokeRefreshToken(boolean revokeRefreshToken) {
+        this.revokeRefreshToken = revokeRefreshToken;
+    }
+
     public int getSsoSessionIdleTimeout() {
         return ssoSessionIdleTimeout;
     }
@@ -243,6 +253,14 @@ public class RealmEntity extends AbstractIdentifiableEntity {
 
     public void setSsoSessionMaxLifespan(int ssoSessionMaxLifespan) {
         this.ssoSessionMaxLifespan = ssoSessionMaxLifespan;
+    }
+
+    public int getOfflineSessionIdleTimeout() {
+        return offlineSessionIdleTimeout;
+    }
+
+    public void setOfflineSessionIdleTimeout(int offlineSessionIdleTimeout) {
+        this.offlineSessionIdleTimeout = offlineSessionIdleTimeout;
     }
 
     public int getAccessTokenLifespan() {

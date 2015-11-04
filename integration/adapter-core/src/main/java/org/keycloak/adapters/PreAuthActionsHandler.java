@@ -1,7 +1,9 @@
 package org.keycloak.adapters;
 
 import org.jboss.logging.Logger;
-import org.keycloak.Version;
+import org.keycloak.adapters.spi.HttpFacade;
+import org.keycloak.adapters.spi.UserSessionManagement;
+import org.keycloak.representations.VersionRepresentation;
 import org.keycloak.constants.AdapterConstants;
 import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.jose.jws.crypto.RSAProvider;
@@ -10,7 +12,7 @@ import org.keycloak.representations.adapters.action.LogoutAction;
 import org.keycloak.representations.adapters.action.PushNotBeforeAction;
 import org.keycloak.representations.adapters.action.TestAvailabilityAction;
 import org.keycloak.util.JsonSerialization;
-import org.keycloak.util.StreamUtil;
+import org.keycloak.common.util.StreamUtil;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -215,7 +217,7 @@ public class PreAuthActionsHandler {
         try {
             facade.getResponse().setStatus(200);
             facade.getResponse().setHeader("Content-Type", "application/json");
-            JsonSerialization.writeValueToStream(facade.getResponse().getOutputStream(), Version.SINGLETON);
+            JsonSerialization.writeValueToStream(facade.getResponse().getOutputStream(), VersionRepresentation.SINGLETON);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

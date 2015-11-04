@@ -7,7 +7,7 @@ import org.jboss.resteasy.spi.NoLogWebApplicationException;
 import org.jboss.resteasy.spi.NotFoundException;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
 import org.jboss.resteasy.spi.UnauthorizedException;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.models.AdminRoles;
 import org.keycloak.models.ClientModel;
@@ -77,6 +77,7 @@ public class AdminRoot {
     /**
      * Convenience path to master realm admin console
      *
+     * @exclude
      * @return
      */
     @GET
@@ -90,6 +91,7 @@ public class AdminRoot {
     /**
      * Convenience path to master realm admin console
      *
+     * @exclude
      * @return
      */
     @Path("index.{html:html}") // expression is actually "index.html" but this is a hack to get around jax-doclet bug
@@ -101,7 +103,7 @@ public class AdminRoot {
     protected RealmModel locateRealm(String name, RealmManager realmManager) {
         RealmModel realm = realmManager.getRealmByName(name);
         if (realm == null) {
-            throw new NotFoundException("Realm " + name + " not found");
+            throw new NotFoundException("Realm not found.  Did you type in a bad URL?");
         }
         return realm;
     }
@@ -118,6 +120,7 @@ public class AdminRoot {
     /**
      * path to realm admin console ui
      *
+     * @exclude
      * @param name Realm name (not id!)
      * @return
      */

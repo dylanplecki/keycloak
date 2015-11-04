@@ -26,7 +26,7 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.keycloak.OAuth2Constants;
-import org.keycloak.enums.SslRequired;
+import org.keycloak.common.enums.SslRequired;
 import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
 import org.keycloak.events.Event;
@@ -46,7 +46,7 @@ import org.keycloak.testsuite.rule.KeycloakRule;
 import org.keycloak.testsuite.rule.WebResource;
 import org.keycloak.testsuite.rule.WebRule;
 import org.keycloak.util.BasicAuthHelper;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Time;
 import org.openqa.selenium.WebDriver;
 
 import javax.ws.rs.client.Client;
@@ -179,6 +179,93 @@ public class RefreshTokenTest {
         Assert.assertNotEquals(tokenEvent.getDetails().get(Details.REFRESH_TOKEN_ID), refreshEvent.getDetails().get(Details.UPDATED_REFRESH_TOKEN_ID));
 
         Time.setOffset(0);
+    }
+
+    @Test
+    public void refreshTokenReuseTokenWithoutRefreshTokensRevoked() throws Exception {
+        try {
+            oauth.doLogin("test-user@localhost", "password");
+
+            Event loginEvent = events.expectLogin().assertEvent();
+
+            String sessionId = loginEvent.getSessionId();
+            String codeId = loginEvent.getDetails().get(Details.CODE_ID);
+
+            String code = oauth.getCurrentQuery().get(OAuth2Constants.CODE);
+
+            AccessTokenResponse response1 = oauth.doAccessTokenRequest(code, "password");
+            RefreshToken refreshToken1 = oauth.verifyRefreshToken(response1.getRefreshToken());
+
+            events.expectCodeToToken(codeId, sessionId).assertEvent();
+
+            Time.setOffset(2);
+
+            AccessTokenResponse response2 = oauth.doRefreshTokenRequest(response1.getRefreshToken(), "password");
+            Assert.assertEquals(200, response2.getStatusCode());
+
+            events.expectRefresh(refreshToken1.getId(), sessionId).assertEvent();
+
+            AccessTokenResponse response3 = oauth.doRefreshTokenRequest(response1.getRefreshToken(), "password");
+
+            Assert.assertEquals(200, response3.getStatusCode());
+
+            events.expectRefresh(refreshToken1.getId(), sessionId).assertEvent();
+        } finally {
+            Time.setOffset(0);
+        }
+    }
+
+    @Test
+    public void refreshTokenReuseTokenWithRefreshTokensRevoked() throws Exception {
+        try {
+            keycloakRule.configure(new KeycloakRule.KeycloakSetup() {
+                @Override
+                public void config(RealmManager manager, RealmModel adminstrationRealm, RealmModel appRealm) {
+                    appRealm.setRevokeRefreshToken(true);
+                }
+            });
+
+            oauth.doLogin("test-user@localhost", "password");
+
+            Event loginEvent = events.expectLogin().assertEvent();
+
+            String sessionId = loginEvent.getSessionId();
+            String codeId = loginEvent.getDetails().get(Details.CODE_ID);
+
+            String code = oauth.getCurrentQuery().get(OAuth2Constants.CODE);
+
+            AccessTokenResponse response1 = oauth.doAccessTokenRequest(code, "password");
+            RefreshToken refreshToken1 = oauth.verifyRefreshToken(response1.getRefreshToken());
+
+            events.expectCodeToToken(codeId, sessionId).assertEvent();
+
+            Time.setOffset(2);
+
+            AccessTokenResponse response2 = oauth.doRefreshTokenRequest(response1.getRefreshToken(), "password");
+            RefreshToken refreshToken2 = oauth.verifyRefreshToken(response2.getRefreshToken());
+
+            Assert.assertEquals(200, response2.getStatusCode());
+
+            events.expectRefresh(refreshToken1.getId(), sessionId).assertEvent();
+
+            AccessTokenResponse response3 = oauth.doRefreshTokenRequest(response1.getRefreshToken(), "password");
+
+            Assert.assertEquals(400, response3.getStatusCode());
+
+            events.expectRefresh(refreshToken1.getId(), sessionId).removeDetail(Details.TOKEN_ID).removeDetail(Details.UPDATED_REFRESH_TOKEN_ID).error("invalid_token").assertEvent();
+
+            oauth.doRefreshTokenRequest(response2.getRefreshToken(), "password");
+
+            events.expectRefresh(refreshToken2.getId(), sessionId).assertEvent();
+        } finally {
+            Time.setOffset(0);
+            keycloakRule.configure(new KeycloakRule.KeycloakSetup() {
+                @Override
+                public void config(RealmManager manager, RealmModel adminstrationRealm, RealmModel appRealm) {
+                    appRealm.setRevokeRefreshToken(false);
+                }
+            });
+        }
     }
 
     PrivateKey privateKey;

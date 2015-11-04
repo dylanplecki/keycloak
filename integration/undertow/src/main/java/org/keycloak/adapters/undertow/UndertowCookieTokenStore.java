@@ -5,9 +5,9 @@ import org.jboss.logging.Logger;
 import org.keycloak.KeycloakPrincipal;
 import org.keycloak.adapters.AdapterTokenStore;
 import org.keycloak.adapters.CookieTokenStore;
-import org.keycloak.adapters.HttpFacade;
-import org.keycloak.adapters.KeycloakAccount;
+import org.keycloak.adapters.spi.HttpFacade;
 import org.keycloak.adapters.KeycloakDeployment;
+import org.keycloak.adapters.OidcKeycloakAccount;
 import org.keycloak.adapters.RefreshableKeycloakSecurityContext;
 import org.keycloak.adapters.RequestAuthenticator;
 
@@ -63,7 +63,7 @@ public class UndertowCookieTokenStore implements AdapterTokenStore {
     }
 
     @Override
-    public void saveAccountInfo(KeycloakAccount account) {
+    public void saveAccountInfo(OidcKeycloakAccount account) {
         RefreshableKeycloakSecurityContext secContext = (RefreshableKeycloakSecurityContext)account.getKeycloakSecurityContext();
         CookieTokenStore.setTokenCookie(deployment, facade, secContext);
     }

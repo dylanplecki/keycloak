@@ -8,7 +8,7 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
         <relativePath>../../../../pom.xml</relativePath>
     </parent>
 
@@ -24,11 +24,11 @@
         </dependency>
         <dependency>
             <groupId>org.keycloak</groupId>
-            <artifactId>keycloak-core</artifactId>
+            <artifactId>keycloak-common</artifactId>
         </dependency>
         <dependency>
             <groupId>org.keycloak</groupId>
-            <artifactId>keycloak-core-jaxrs</artifactId>
+            <artifactId>keycloak-core</artifactId>
         </dependency>
         <dependency>
             <groupId>org.keycloak</groupId>

@@ -1,11 +1,27 @@
+/*
+ * Copyright 2015 Red Hat Inc. and/or its affiliates and other contributors
+ * as indicated by the @author tags. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.keycloak.services.managers;
 
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.specimpl.MultivaluedMapImpl;
 import org.jboss.resteasy.spi.HttpRequest;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.RSATokenVerifier;
-import org.keycloak.VerificationException;
+import org.keycloak.common.VerificationException;
 import org.keycloak.authentication.RequiredActionContext;
 import org.keycloak.authentication.RequiredActionContextResult;
 import org.keycloak.authentication.RequiredActionFactory;
@@ -17,35 +33,20 @@ import org.keycloak.events.EventBuilder;
 import org.keycloak.events.EventType;
 import org.keycloak.jose.jws.JWSBuilder;
 import org.keycloak.login.LoginFormsProvider;
-import org.keycloak.models.ClientModel;
-import org.keycloak.models.ClientSessionModel;
-import org.keycloak.models.RequiredActionProviderModel;
-import org.keycloak.models.UserConsentModel;
-import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.ProtocolMapperModel;
-import org.keycloak.models.RealmModel;
-import org.keycloak.models.RoleModel;
-import org.keycloak.models.UserModel;
-import org.keycloak.models.UserSessionModel;
+import org.keycloak.models.*;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.protocol.LoginProtocol;
 import org.keycloak.protocol.RestartLoginCookie;
 import org.keycloak.protocol.oidc.TokenManager;
 import org.keycloak.representations.AccessToken;
+import org.keycloak.services.Urls;
 import org.keycloak.services.messages.Messages;
 import org.keycloak.services.resources.IdentityBrokerService;
 import org.keycloak.services.resources.RealmsResource;
-import org.keycloak.services.Urls;
 import org.keycloak.services.util.CookieHelper;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Time;
 
-import javax.ws.rs.core.Cookie;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.NewCookie;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
-
+import javax.ws.rs.core.*;
 import java.net.URI;
 import java.util.LinkedList;
 import java.util.List;
@@ -67,6 +68,7 @@ public class AuthenticationManager {
     public static final String KEYCLOAK_SESSION_COOKIE = "KEYCLOAK_SESSION";
     public static final String KEYCLOAK_REMEMBER_ME = "KEYCLOAK_REMEMBER_ME";
     public static final String KEYCLOAK_LOGOUT_PROTOCOL = "KEYCLOAK_LOGOUT_PROTOCOL";
+    public static final String CURRENT_REQUIRED_ACTION = "CURRENT_REQUIRED_ACTION";
 
     protected BruteForceProtector protector;
 
@@ -97,7 +99,7 @@ public class AuthenticationManager {
             Cookie cookie = headers.getCookies().get(KEYCLOAK_IDENTITY_COOKIE);
             if (cookie == null) return;
             String tokenString = cookie.getValue();
-            AccessToken token = RSATokenVerifier.verifyToken(tokenString, realm.getPublicKey(), Urls.realmIssuer(uriInfo.getBaseUri(), realm.getName()), false);
+            AccessToken token = RSATokenVerifier.verifyToken(tokenString, realm.getPublicKey(), Urls.realmIssuer(uriInfo.getBaseUri(), realm.getName()), false, false);
             UserSessionModel cookieSession = session.sessions().getUserSession(realm, token.getSessionState());
             if (cookieSession == null || !cookieSession.getId().equals(userSession.getId())) return;
             expireIdentityCookie(realm, uriInfo, connection);
@@ -365,7 +367,7 @@ public class AuthenticationManager {
         }
 
         String tokenString = cookie.getValue();
-        AuthResult authResult = verifyIdentityToken(session, realm, session.getContext().getUri(), session.getContext().getConnection(), checkActive, tokenString, session.getContext().getRequestHeaders());
+        AuthResult authResult = verifyIdentityToken(session, realm, session.getContext().getUri(), session.getContext().getConnection(), checkActive, false, tokenString, session.getContext().getRequestHeaders());
         if (authResult == null) {
             expireIdentityCookie(realm, session.getContext().getUri(), session.getContext().getConnection());
             return null;
@@ -393,6 +395,10 @@ public class AuthenticationManager {
                 }
             }
         }
+
+        // Updates users locale if required
+        session.getContext().resolveLocale(userSession.getUser());
+
         // refresh the cookies!
         createLoginCookie(realm, userSession.getUser(), userSession, uriInfo, clientConnection);
         if (userSession.getState() != UserSessionModel.State.LOGGED_IN) userSession.setState(UserSessionModel.State.LOGGED_IN);
@@ -520,6 +526,7 @@ public class AuthenticationManager {
                 return protocol.consentDenied(context.getClientSession());
             }
             else if (context.getStatus() == RequiredActionContext.Status.CHALLENGE) {
+                clientSession.setNote(CURRENT_REQUIRED_ACTION, model.getProviderId());
                 return context.getChallenge();
             }
             else if (context.getStatus() == RequiredActionContext.Status.SUCCESS) {
@@ -569,9 +576,10 @@ public class AuthenticationManager {
     }
 
 
-    protected static AuthResult verifyIdentityToken(KeycloakSession session, RealmModel realm, UriInfo uriInfo, ClientConnection connection, boolean checkActive, String tokenString, HttpHeaders headers) {
+    protected static AuthResult verifyIdentityToken(KeycloakSession session, RealmModel realm, UriInfo uriInfo, ClientConnection connection, boolean checkActive, boolean checkTokenType,
+                                                    String tokenString, HttpHeaders headers) {
         try {
-            AccessToken token = RSATokenVerifier.verifyToken(tokenString, realm.getPublicKey(), Urls.realmIssuer(uriInfo.getBaseUri(), realm.getName()), checkActive);
+            AccessToken token = RSATokenVerifier.verifyToken(tokenString, realm.getPublicKey(), Urls.realmIssuer(uriInfo.getBaseUri(), realm.getName()), checkActive, checkTokenType);
             if (checkActive) {
                 if (!token.isActive() || token.getIssuedAt() < realm.getNotBefore()) {
                     logger.debug("identity cookie expired");

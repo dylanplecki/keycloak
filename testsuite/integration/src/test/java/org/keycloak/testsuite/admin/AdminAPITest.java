@@ -25,7 +25,7 @@ import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.keycloak.Config;
-import org.keycloak.Version;
+import org.keycloak.common.Version;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientSessionModel;
 import org.keycloak.models.Constants;
@@ -85,7 +85,7 @@ public class AdminAPITest {
             ClientSessionModel clientSession = session.sessions().createClientSession(adminRealm, adminConsole);
             clientSession.setNote(OIDCLoginProtocol.ISSUER, "http://localhost:8081/auth/realms/master");
             UserSessionModel userSession = session.sessions().createUserSession(adminRealm, admin, "admin", null, "form", false, null, null);
-            AccessToken token = tm.createClientAccessToken(session, tm.getAccess(null, adminConsole, admin), adminRealm, adminConsole, admin, userSession, clientSession);
+            AccessToken token = tm.createClientAccessToken(session, tm.getAccess(null, true, adminConsole, admin), adminRealm, adminConsole, admin, userSession, clientSession);
             return tm.encodeToken(adminRealm, token);
         } finally {
             keycloakRule.stopSession(session, true);
@@ -133,6 +133,9 @@ public class AdminAPITest {
                 ClientRepresentation newApp = new ClientRepresentation();
                 if (appRep.getId() != null) newApp.setId(appRep.getId());
                 newApp.setClientId(appRep.getClientId());
+                if (appRep.getClientAuthenticatorType() != null) {
+                    newApp.setClientAuthenticatorType(appRep.getClientAuthenticatorType());
+                }
                 if (appRep.getSecret() != null) {
                     newApp.setSecret(appRep.getSecret());
                 }
@@ -174,9 +177,11 @@ public class AdminAPITest {
         if (appRep.isBearerOnly() != null) Assert.assertEquals(appRep.isBearerOnly(), storedApp.isBearerOnly());
         if (appRep.isPublicClient() != null) Assert.assertEquals(appRep.isPublicClient(), storedApp.isPublicClient());
         if (appRep.isFullScopeAllowed() != null) Assert.assertEquals(appRep.isFullScopeAllowed(), storedApp.isFullScopeAllowed());
+        if (appRep.getRootUrl() != null) Assert.assertEquals(appRep.getRootUrl(), storedApp.getRootUrl());
         if (appRep.getAdminUrl() != null) Assert.assertEquals(appRep.getAdminUrl(), storedApp.getAdminUrl());
         if (appRep.getBaseUrl() != null) Assert.assertEquals(appRep.getBaseUrl(), storedApp.getBaseUrl());
         if (appRep.isSurrogateAuthRequired() != null) Assert.assertEquals(appRep.isSurrogateAuthRequired(), storedApp.isSurrogateAuthRequired());
+        if (appRep.getClientAuthenticatorType() != null) Assert.assertEquals(appRep.getClientAuthenticatorType(), storedApp.getClientAuthenticatorType());
 
         if (appRep.getNotBefore() != null) {
             Assert.assertEquals(appRep.getNotBefore(), storedApp.getNotBefore());

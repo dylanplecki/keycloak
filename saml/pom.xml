@@ -3,7 +3,7 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <name>Keycloak SAML Integration</name>
@@ -16,5 +16,6 @@
     <modules>
         <module>saml-core</module>
         <module>saml-protocol</module>
+        <module>client-adapter</module>
     </modules>
 </project>

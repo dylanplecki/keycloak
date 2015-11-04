@@ -4,7 +4,7 @@ import org.jboss.logging.Logger;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.constants.AdapterConstants;
 import org.keycloak.representations.AccessToken;
-import org.keycloak.util.UriUtils;
+import org.keycloak.common.util.UriUtils;
 
 import java.io.IOException;
 import java.util.Set;
@@ -23,9 +23,9 @@ import java.util.Set;
 public class AuthenticatedActionsHandler {
     private static final Logger log = Logger.getLogger(AuthenticatedActionsHandler.class);
     protected KeycloakDeployment deployment;
-    protected HttpFacade facade;
+    protected OIDCHttpFacade facade;
 
-    public AuthenticatedActionsHandler(KeycloakDeployment deployment, HttpFacade facade) {
+    public AuthenticatedActionsHandler(KeycloakDeployment deployment, OIDCHttpFacade facade) {
         this.deployment = deployment;
         this.facade = facade;
     }

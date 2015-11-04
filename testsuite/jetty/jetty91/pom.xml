@@ -4,7 +4,7 @@
     <parent>
         <artifactId>keycloak-testsuite-pom</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -111,6 +111,10 @@
            <artifactId>keycloak-jetty91-adapter</artifactId>
        </dependency>
        <dependency>
+           <groupId>org.keycloak</groupId>
+           <artifactId>keycloak-saml-jetty91-adapter</artifactId>
+       </dependency>
+       <dependency>
             <groupId>org.jboss.logging</groupId>
             <artifactId>jboss-logging</artifactId>
         </dependency>
@@ -144,7 +148,7 @@
         </dependency>
         <dependency>
             <groupId>org.hibernate.javax.persistence</groupId>
-            <artifactId>hibernate-jpa-2.1-api</artifactId>
+            <artifactId>${hibernate.javax.persistence.artifactId}</artifactId>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>

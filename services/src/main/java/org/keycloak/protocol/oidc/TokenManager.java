@@ -1,10 +1,11 @@
 package org.keycloak.protocol.oidc;
 
 import org.jboss.logging.Logger;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
+import org.keycloak.OAuth2Constants;
 import org.keycloak.OAuthErrorException;
-import org.keycloak.authentication.AuthenticationProcessor;
 import org.keycloak.events.Details;
+import org.keycloak.events.Errors;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.jose.jws.JWSBuilder;
 import org.keycloak.jose.jws.JWSInput;
@@ -23,18 +24,28 @@ import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.protocol.ProtocolMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAccessTokenMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCIDTokenMapper;
+import org.keycloak.protocol.oidc.utils.WebOriginsUtils;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.AccessTokenResponse;
 import org.keycloak.representations.IDToken;
 import org.keycloak.representations.RefreshToken;
+import org.keycloak.services.ErrorResponseException;
 import org.keycloak.services.managers.AuthenticationManager;
 import org.keycloak.services.managers.ClientSessionCode;
-import org.keycloak.util.Time;
+import org.keycloak.services.managers.UserSessionManager;
+import org.keycloak.util.TokenUtil;
+import org.keycloak.common.util.Time;
 
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -85,16 +96,35 @@ public class TokenManager {
             throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "User disabled", "User disabled");
         }
 
-        UserSessionModel userSession = session.sessions().getUserSession(realm, oldToken.getSessionState());
-        if (!AuthenticationManager.isSessionValid(realm, userSession)) {
-            AuthenticationManager.backchannelLogout(session, realm, userSession, uriInfo, connection, headers, true);
-            throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Session not active", "Session not active");
-        }
+        UserSessionModel userSession = null;
         ClientSessionModel clientSession = null;
-        for (ClientSessionModel clientSessionModel : userSession.getClientSessions()) {
-            if (clientSessionModel.getId().equals(oldToken.getClientSession())) {
-                clientSession = clientSessionModel;
-                break;
+        if (TokenUtil.TOKEN_TYPE_OFFLINE.equals(oldToken.getType())) {
+
+            UserSessionManager sessionManager = new UserSessionManager(session);
+            clientSession = sessionManager.findOfflineClientSession(realm, oldToken.getClientSession(), oldToken.getSessionState());
+            if (clientSession != null) {
+                userSession = clientSession.getUserSession();
+
+                // Revoke timeouted offline userSession
+                if (userSession.getLastSessionRefresh() < Time.currentTime() - realm.getOfflineSessionIdleTimeout()) {
+                    sessionManager.revokeOfflineUserSession(userSession);
+                    userSession = null;
+                    clientSession = null;
+                }
+            }
+        } else {
+            // Find userSession regularly for online tokens
+            userSession = session.sessions().getUserSession(realm, oldToken.getSessionState());
+            if (!AuthenticationManager.isSessionValid(realm, userSession)) {
+                AuthenticationManager.backchannelLogout(session, realm, userSession, uriInfo, connection, headers, true);
+                throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Session not active", "Session not active");
+            }
+
+            for (ClientSessionModel clientSessionModel : userSession.getClientSessions()) {
+                if (clientSessionModel.getId().equals(oldToken.getClientSession())) {
+                    clientSession = clientSessionModel;
+                    break;
+                }
             }
         }
 
@@ -117,7 +147,8 @@ public class TokenManager {
 
 
         // recreate token.
-        Set<RoleModel> requestedRoles = TokenManager.getAccess(null, clientSession.getClient(), user);
+        String scopeParam = clientSession.getNote(OAuth2Constants.SCOPE);
+        Set<RoleModel> requestedRoles = TokenManager.getAccess(scopeParam, true, clientSession.getClient(), user);
         AccessToken newToken = createClientAccessToken(session, requestedRoles, realm, client, user, userSession, clientSession);
         verifyAccess(oldToken, newToken);
 
@@ -126,10 +157,12 @@ public class TokenManager {
 
     }
 
-    public AccessTokenResponse refreshAccessToken(KeycloakSession session, UriInfo uriInfo, ClientConnection connection, RealmModel realm, ClientModel authorizedClient, String encodedRefreshToken, EventBuilder event, HttpHeaders headers) throws OAuthErrorException {
+    public RefreshResult refreshAccessToken(KeycloakSession session, UriInfo uriInfo, ClientConnection connection, RealmModel realm, ClientModel authorizedClient, String encodedRefreshToken, EventBuilder event, HttpHeaders headers) throws OAuthErrorException {
         RefreshToken refreshToken = verifyRefreshToken(realm, encodedRefreshToken);
 
-        event.user(refreshToken.getSubject()).session(refreshToken.getSessionState()).detail(Details.REFRESH_TOKEN_ID, refreshToken.getId());
+        event.user(refreshToken.getSubject()).session(refreshToken.getSessionState())
+                .detail(Details.REFRESH_TOKEN_ID, refreshToken.getId())
+                .detail(Details.REFRESH_TOKEN_TYPE, refreshToken.getType());
 
         TokenValidation validation = validateToken(session, uriInfo, connection, realm, refreshToken, headers);
         // validate authorizedClient is same as validated client
@@ -138,13 +171,26 @@ public class TokenManager {
         }
 
         int currentTime = Time.currentTime();
+
+        if (realm.isRevokeRefreshToken()) {
+            int serverStartupTime = (int)(session.getKeycloakSessionFactory().getServerStartupTimestamp() / 1000);
+
+            if (refreshToken.getIssuedAt() < validation.clientSession.getTimestamp() && (serverStartupTime != validation.clientSession.getTimestamp())) {
+                throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Stale token");
+            }
+
+        }
+
+        validation.clientSession.setTimestamp(currentTime);
         validation.userSession.setLastSessionRefresh(currentTime);
 
         AccessTokenResponse res = responseBuilder(realm, authorizedClient, event, session, validation.userSession, validation.clientSession)
                 .accessToken(validation.newToken)
                 .generateIDToken()
-                .generateRefreshToken().build();
-        return res;
+                .generateRefreshToken()
+                .build();
+
+        return new RefreshResult(res, TokenUtil.TOKEN_TYPE_OFFLINE.equals(refreshToken.getType()));
     }
 
     public RefreshToken verifyRefreshToken(RealmModel realm, String encodedRefreshToken) throws OAuthErrorException {
@@ -158,7 +204,7 @@ public class TokenManager {
         } catch (Exception e) {
             throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Invalid refresh token", e);
         }
-        if (refreshToken.isExpired()) {
+        if (refreshToken.getExpiration() != 0 && refreshToken.isExpired()) {
             throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Refresh token expired");
         }
 
@@ -172,24 +218,24 @@ public class TokenManager {
         IDToken idToken = null;
         try {
             if (!RSAProvider.verify(jws, realm.getPublicKey())) {
-                throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Invalid refresh token");
+                throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Invalid IDToken");
             }
             idToken = jws.readJsonContent(IDToken.class);
         } catch (IOException e) {
-            throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Invalid refresh token", e);
+            throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Invalid IDToken", e);
         }
         if (idToken.isExpired()) {
-            throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Refresh token expired");
+            throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "IDToken expired");
         }
 
         if (idToken.getIssuedAt() < realm.getNotBefore()) {
-            throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Stale refresh token");
+            throw new OAuthErrorException(OAuthErrorException.INVALID_GRANT, "Stale IDToken");
         }
         return idToken;
     }
 
     public AccessToken createClientAccessToken(KeycloakSession session, Set<RoleModel> requestedRoles, RealmModel realm, ClientModel client, UserModel user, UserSessionModel userSession, ClientSessionModel clientSession) {
-        AccessToken token = initToken(realm, client, user, userSession, clientSession);
+        AccessToken token = initToken(realm, client, user, userSession, clientSession, session.getContext().getUri());
         for (RoleModel role : requestedRoles) {
             addComposites(token, role);
         }
@@ -206,7 +252,8 @@ public class TokenManager {
         clientSession.setUserSession(session);
         Set<String> requestedRoles = new HashSet<String>();
         // todo scope param protocol independent
-        for (RoleModel r : TokenManager.getAccess(null, clientSession.getClient(), user)) {
+        String scopeParam = clientSession.getNote(OAuth2Constants.SCOPE);
+        for (RoleModel r : TokenManager.getAccess(scopeParam, true, clientSession.getClient(), user)) {
             requestedRoles.add(r.getId());
         }
         clientSession.setRoles(requestedRoles);
@@ -242,26 +289,86 @@ public class TokenManager {
         }
     }
 
-    public static Set<RoleModel> getAccess(String scopeParam, ClientModel client, UserModel user) {
-        // todo scopeParam is ignored until we figure out a scheme that fits with openid connect
+    public static Set<RoleModel> getAccess(String scopeParam, boolean applyScopeParam, ClientModel client, UserModel user) {
         Set<RoleModel> requestedRoles = new HashSet<RoleModel>();
 
         Set<RoleModel> roleMappings = user.getRoleMappings();
-        if (client.isFullScopeAllowed()) return roleMappings;
 
-        Set<RoleModel> scopeMappings = client.getScopeMappings();
-        if (client instanceof ClientModel) {
-            scopeMappings.addAll(((ClientModel) client).getRoles());
-        }
+        if (client.isFullScopeAllowed()) {
+            requestedRoles = roleMappings;
+        } else {
 
-        for (RoleModel role : roleMappings) {
-            for (RoleModel desiredRole : scopeMappings) {
-                Set<RoleModel> visited = new HashSet<RoleModel>();
-                applyScope(role, desiredRole, visited, requestedRoles);
+            Set<RoleModel> scopeMappings = client.getScopeMappings();
+            scopeMappings.addAll(client.getRoles());
+
+            for (RoleModel role : roleMappings) {
+                for (RoleModel desiredRole : scopeMappings) {
+                    Set<RoleModel> visited = new HashSet<RoleModel>();
+                    applyScope(role, desiredRole, visited, requestedRoles);
+                }
             }
         }
 
+        if (applyScopeParam) {
+            Collection<String> scopeParamRoles;
+            if (scopeParam != null) {
+                String[] scopes = scopeParam.split(" ");
+                scopeParamRoles = Arrays.asList(scopes);
+            } else {
+                scopeParamRoles = Collections.emptyList();
+            }
+
+            Set<RoleModel> roles = new HashSet<>();
+            for (RoleModel role : requestedRoles) {
+                String roleName = getRoleNameForScopeParam(role);
+                if (!role.isScopeParamRequired() || scopeParamRoles.contains(roleName)) {
+                    roles.add(role);
+                } else {
+                    if (logger.isTraceEnabled()) {
+                        logger.tracef("Role '%s' excluded by scope param. Client is '%s', User is '%s', Scope param is '%s' ", role.getName(), client.getClientId(), user.getUsername(), scopeParam);
+                    }
+                }
+            }
+
+            // Add all roles specified in scope parameter directly into requestedRoles, even if they are available just through composite role
+            List<RoleModel> scopeRoles = new LinkedList<>();
+            for (String scopeParamPart : scopeParamRoles) {
+                RoleModel scopeParamRole = getRoleFromScopeParam(client.getRealm(), scopeParamPart);
+                if (scopeParamRole != null) {
+                    for (RoleModel role : roles) {
+                        if (role.hasRole(scopeParamRole)) {
+                            scopeRoles.add(scopeParamRole);
+                        }
+                    }
+                }
+            }
+
+            roles.addAll(scopeRoles);
+            requestedRoles = roles;
+        }
+
         return requestedRoles;
+    }
+
+    // For now, just use "roleName" for realm roles and "clientId/roleName" for client roles
+    private static String getRoleNameForScopeParam(RoleModel role) {
+        if (role.getContainer() instanceof RealmModel) {
+            return role.getName();
+        } else {
+            ClientModel client = (ClientModel) role.getContainer();
+            return client.getClientId() + "/" + role.getName();
+        }
+    }
+
+    // For now, just use "roleName" for realm roles and "clientId/roleName" for client roles
+    private static RoleModel getRoleFromScopeParam(RealmModel realm, String scopeParamRole) {
+        String[] parts = scopeParamRole.split("/");
+        if (parts.length == 1) {
+            return realm.getRole(parts[0]);
+        } else {
+            ClientModel roleClient = realm.getClientByClientId(parts[0]);
+            return roleClient!=null ? roleClient.getRole(parts[1]) : null;
+        }
     }
 
     public void verifyAccess(AccessToken token, AccessToken newToken) throws OAuthErrorException {
@@ -317,10 +424,11 @@ public class TokenManager {
     }
 
 
-    protected AccessToken initToken(RealmModel realm, ClientModel client, UserModel user, UserSessionModel session, ClientSessionModel clientSession) {
+    protected AccessToken initToken(RealmModel realm, ClientModel client, UserModel user, UserSessionModel session, ClientSessionModel clientSession, UriInfo uriInfo) {
         AccessToken token = new AccessToken();
         if (clientSession != null) token.clientSession(clientSession.getId());
         token.id(KeycloakModelUtils.generateId());
+        token.type(TokenUtil.TOKEN_TYPE_BEARER);
         token.subject(user.getId());
         token.audience(client.getClientId());
         token.issuedNow();
@@ -335,7 +443,7 @@ public class TokenManager {
         }
         Set<String> allowedOrigins = client.getWebOrigins();
         if (allowedOrigins != null) {
-            token.setAllowedOrigins(allowedOrigins);
+            token.setAllowedOrigins(WebOriginsUtils.resolveValidWebOrigins(uriInfo, client));
         }
         return token;
     }
@@ -409,8 +517,10 @@ public class TokenManager {
             return this;
         }
 
-        public AccessTokenResponseBuilder generateAccessToken(KeycloakSession session, String scopeParam, ClientModel client, UserModel user, UserSessionModel userSession, ClientSessionModel clientSession) {
-            Set<RoleModel> requestedRoles = getAccess(scopeParam, client, user);
+        public AccessTokenResponseBuilder generateAccessToken() {
+            UserModel user = userSession.getUser();
+            String scopeParam = clientSession.getNote(OIDCLoginProtocol.SCOPE_PARAM);
+            Set<RoleModel> requestedRoles = getAccess(scopeParam, true, client, user);
             accessToken = createClientAccessToken(session, requestedRoles, realm, client, user, userSession, clientSession);
             return this;
         }
@@ -419,10 +529,25 @@ public class TokenManager {
             if (accessToken == null) {
                 throw new IllegalStateException("accessToken not set");
             }
-            refreshToken = new RefreshToken(accessToken);
+
+            String scopeParam = clientSession.getNote(OIDCLoginProtocol.SCOPE_PARAM);
+            boolean offlineTokenRequested = TokenUtil.isOfflineTokenRequested(scopeParam);
+            if (offlineTokenRequested) {
+                UserSessionManager sessionManager = new UserSessionManager(session);
+                if (!sessionManager.isOfflineTokenAllowed(clientSession)) {
+                    event.error(Errors.NOT_ALLOWED);
+                    throw new ErrorResponseException("not_allowed", "Offline tokens not allowed for the user or client", Response.Status.BAD_REQUEST);
+                }
+
+                refreshToken = new RefreshToken(accessToken);
+                refreshToken.type(TokenUtil.TOKEN_TYPE_OFFLINE);
+                sessionManager.createOrUpdateOfflineSession(clientSession, userSession);
+            } else {
+                refreshToken = new RefreshToken(accessToken);
+                refreshToken.expiration(Time.currentTime() + realm.getSsoSessionIdleTimeout());
+            }
             refreshToken.id(KeycloakModelUtils.generateId());
             refreshToken.issuedNow();
-            refreshToken.expiration(Time.currentTime() + realm.getSsoSessionIdleTimeout());
             return this;
         }
 
@@ -432,6 +557,7 @@ public class TokenManager {
             }
             idToken = new IDToken();
             idToken.id(KeycloakModelUtils.generateId());
+            idToken.type(TokenUtil.TOKEN_TYPE_ID);
             idToken.subject(accessToken.getSubject());
             idToken.audience(client.getClientId());
             idToken.issuedNow();
@@ -459,6 +585,7 @@ public class TokenManager {
                 } else {
                     event.detail(Details.REFRESH_TOKEN_ID, refreshToken.getId());
                 }
+                event.detail(Details.REFRESH_TOKEN_TYPE, refreshToken.getType());
             }
 
             AccessTokenResponse res = new AccessTokenResponse();
@@ -486,6 +613,25 @@ public class TokenManager {
             if (client.getNotBefore() > notBefore) notBefore = client.getNotBefore();
             res.setNotBeforePolicy(notBefore);
             return res;
+        }
+    }
+
+    public class RefreshResult {
+
+        private final AccessTokenResponse response;
+        private final boolean offlineToken;
+
+        private RefreshResult(AccessTokenResponse response, boolean offlineToken) {
+            this.response = response;
+            this.offlineToken = offlineToken;
+        }
+
+        public AccessTokenResponse getResponse() {
+            return response;
+        }
+
+        public boolean isOfflineToken() {
+            return offlineToken;
         }
     }
 

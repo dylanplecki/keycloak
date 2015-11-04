@@ -4,6 +4,7 @@ import org.jboss.logging.Logger;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -110,7 +111,7 @@ public class UserFederationManager implements UserProvider {
             if (realmModel == null) return;
             UserModel deletedUser = tx.userStorage().getUserById(user.getId(), realmModel);
             tx.userStorage().removeUser(realmModel, deletedUser);
-            logger.infof("Removed invalid user '%s'", user.getUsername());
+            logger.debugf("Removed invalid user '%s'", user.getUsername());
             tx.getTransaction().commit();
         } finally {
             tx.close();
@@ -314,8 +315,8 @@ public class UserFederationManager implements UserProvider {
     }
 
     @Override
-    public List<UserModel> searchForUserByUserAttributes(Map<String, String> attributes, RealmModel realm) {
-        return session.userStorage().searchForUserByUserAttributes(attributes, realm);
+    public List<UserModel> searchForUserByUserAttribute(String attrName, String attrValue, RealmModel realm) {
+        return session.userStorage().searchForUserByUserAttribute(attrName, attrValue, realm);
     }
 
     @Override
@@ -330,6 +331,12 @@ public class UserFederationManager implements UserProvider {
         validateUser(realm, user);
         if (user == null) throw new IllegalStateException("Federated user no longer valid");
         return session.userStorage().getFederatedIdentity(user, socialProvider, realm);
+    }
+
+    @Override
+    public void grantToAllUsers(RealmModel realm, RoleModel role) {
+        // not federation-aware for now
+        session.userStorage().grantToAllUsers(realm, role);
     }
 
     @Override

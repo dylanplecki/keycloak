@@ -32,6 +32,11 @@ public interface AuthenticationFlowContext extends AbstractAuthenticationFlowCon
      */
     void setUser(UserModel user);
 
+    /**
+     * Clear the user from the flow.
+     */
+    void clearUser();
+
     void attachUserSession(UserSessionModel userSession);
 
 
@@ -70,6 +75,12 @@ public interface AuthenticationFlowContext extends AbstractAuthenticationFlowCon
      *
      */
     void cancelLogin();
+
+    /**
+     * Reset the current flow to the beginning and restarts it.
+     *
+     */
+    void resetFlow();
 
     /**
      * Fork the current flow.  The client session will be cloned and set to point at the realm's browser login flow.  The Response will be the result

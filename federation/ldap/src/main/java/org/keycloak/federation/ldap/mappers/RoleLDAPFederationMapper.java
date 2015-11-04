@@ -54,6 +54,9 @@ public class RoleLDAPFederationMapper extends AbstractLDAPFederationMapper {
 
     // See docs for Mode enum
     public static final String MODE = "mode";
+    
+    // Customized LDAP filter which is added to the whole LDAP query
+    public static final String ROLES_LDAP_FILTER = "roles.ldap.filter";
 
 
     // List of IDs of UserFederationMapperModels where syncRolesFromLDAP was already called in this KeycloakSession. This is to improve performance
@@ -106,7 +109,7 @@ public class RoleLDAPFederationMapper extends AbstractLDAPFederationMapper {
                 String roleName = ldapRole.getAttributeAsString(rolesRdnAttr);
 
                 if (roleContainer.getRole(roleName) == null) {
-                    logger.infof("Syncing role [%s] from LDAP to keycloak DB", roleName);
+                    logger.debugf("Syncing role [%s] from LDAP to keycloak DB", roleName);
                     roleContainer.addRole(roleName);
                 }
             }
@@ -128,6 +131,7 @@ public class RoleLDAPFederationMapper extends AbstractLDAPFederationMapper {
         ldapQuery.addObjectClasses(roleObjectClasses);
 
         String rolesRdnAttr = getRoleNameLdapAttribute(mapperModel);
+        ldapQuery.setLdapFilter(mapperModel.getConfig().get(RoleLDAPFederationMapper.ROLES_LDAP_FILTER));
         String membershipAttr = getMembershipLdapAttribute(mapperModel);
         ldapQuery.addReturningLdapAttribute(rolesRdnAttr);
         ldapQuery.addReturningLdapAttribute(membershipAttr);
@@ -208,7 +212,7 @@ public class RoleLDAPFederationMapper extends AbstractLDAPFederationMapper {
         roleDn.addFirst(roleNameAttribute, roleName);
         ldapObject.setDn(roleDn);
 
-        logger.infof("Creating role [%s] to LDAP with DN [%s]", roleName, roleDn.toString());
+        logger.debugf("Creating role [%s] to LDAP with DN [%s]", roleName, roleDn.toString());
         ldapProvider.getLdapIdentityStore().add(ldapObject);
         return ldapObject;
     }

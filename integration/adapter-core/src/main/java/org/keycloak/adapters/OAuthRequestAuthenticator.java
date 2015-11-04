@@ -3,18 +3,21 @@ package org.keycloak.adapters;
 import org.jboss.logging.Logger;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.RSATokenVerifier;
-import org.keycloak.VerificationException;
+import org.keycloak.adapters.spi.AdapterSessionStore;
+import org.keycloak.adapters.spi.AuthChallenge;
+import org.keycloak.adapters.spi.AuthOutcome;
+import org.keycloak.adapters.spi.HttpFacade;
+import org.keycloak.common.VerificationException;
 import org.keycloak.constants.AdapterConstants;
 import org.keycloak.enums.TokenStore;
 import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.AccessTokenResponse;
 import org.keycloak.representations.IDToken;
-import org.keycloak.util.KeycloakUriBuilder;
-import org.keycloak.util.UriUtils;
+import org.keycloak.common.util.KeycloakUriBuilder;
+import org.keycloak.common.util.UriUtils;
 
 import java.io.IOException;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -27,7 +30,7 @@ public class OAuthRequestAuthenticator {
     protected KeycloakDeployment deployment;
     protected RequestAuthenticator reqAuthenticator;
     protected int sslRedirectPort;
-    protected AdapterTokenStore tokenStore;
+    protected AdapterSessionStore tokenStore;
     protected String tokenString;
     protected String idTokenString;
     protected IDToken idToken;
@@ -37,7 +40,7 @@ public class OAuthRequestAuthenticator {
     protected String refreshToken;
     protected String strippedOauthParametersRequestUri;
 
-    public OAuthRequestAuthenticator(RequestAuthenticator requestAuthenticator, HttpFacade facade, KeycloakDeployment deployment, int sslRedirectPort, AdapterTokenStore tokenStore) {
+    public OAuthRequestAuthenticator(RequestAuthenticator requestAuthenticator, HttpFacade facade, KeycloakDeployment deployment, int sslRedirectPort, AdapterSessionStore tokenStore) {
         this.reqAuthenticator = requestAuthenticator;
         this.facade = facade;
         this.deployment = deployment;
@@ -93,12 +96,12 @@ public class OAuthRequestAuthenticator {
         return facade.getRequest().isSecure();
     }
 
-    protected HttpFacade.Cookie getCookie(String cookieName) {
+    protected OIDCHttpFacade.Cookie getCookie(String cookieName) {
         return facade.getRequest().getCookie(cookieName);
     }
 
     protected String getCookieValue(String cookieName) {
-        HttpFacade.Cookie cookie = getCookie(cookieName);
+        OIDCHttpFacade.Cookie cookie = getCookie(cookieName);
         if (cookie == null) return null;
         return cookie.getValue();
     }
@@ -135,6 +138,9 @@ public class OAuthRequestAuthenticator {
         String idpHint = getQueryParamValue(AdapterConstants.KC_IDP_HINT);
         url = UriUtils.stripQueryParam(url, AdapterConstants.KC_IDP_HINT);
 
+        String scope = getQueryParamValue(OAuth2Constants.SCOPE);
+        url = UriUtils.stripQueryParam(url, OAuth2Constants.SCOPE);
+
         KeycloakUriBuilder redirectUriBuilder = deployment.getAuthUrl().clone()
                 .queryParam(OAuth2Constants.RESPONSE_TYPE, OAuth2Constants.CODE)
                 .queryParam(OAuth2Constants.CLIENT_ID, deployment.getResourceName())
@@ -146,6 +152,9 @@ public class OAuthRequestAuthenticator {
         }
         if (idpHint != null && idpHint.length() > 0) {
             redirectUriBuilder.queryParam(AdapterConstants.KC_IDP_HINT,idpHint);
+        }
+        if (scope != null && scope.length() > 0) {
+            redirectUriBuilder.queryParam(OAuth2Constants.SCOPE, scope);
         }
 
         return redirectUriBuilder.build().toString();
@@ -176,6 +185,11 @@ public class OAuthRequestAuthenticator {
                 public boolean errorPage() {
                     return true;
                 }
+
+                @Override
+                public int getResponseCode() {
+                    return 403;
+                }
             };
         }
         return new AuthChallenge() {
@@ -183,6 +197,11 @@ public class OAuthRequestAuthenticator {
             @Override
             public boolean errorPage() {
                 return false;
+            }
+
+            @Override
+            public int getResponseCode() {
+                return 0;
             }
 
             @Override
@@ -198,7 +217,7 @@ public class OAuthRequestAuthenticator {
     }
 
     protected AuthChallenge checkStateCookie() {
-        HttpFacade.Cookie stateCookie = getCookie(deployment.getStateCookieName());
+        OIDCHttpFacade.Cookie stateCookie = getCookie(deployment.getStateCookieName());
 
         if (stateCookie == null) {
             log.warn("No state cookie");
@@ -255,6 +274,11 @@ public class OAuthRequestAuthenticator {
             @Override
             public boolean errorPage() {
                 return true;
+            }
+
+            @Override
+            public int getResponseCode() {
+                return code;
             }
 
             @Override

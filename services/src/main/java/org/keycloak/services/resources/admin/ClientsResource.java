@@ -52,9 +52,9 @@ public class ClientsResource {
     }
 
     /**
-     * List of clients belonging to this realm.
+     * Get clients belonging to the realm
      *
-     * @return
+     * Returns a list of clients belonging to the realm
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -73,6 +73,7 @@ public class ClientsResource {
                 ClientRepresentation client = new ClientRepresentation();
                 client.setId(clientModel.getId());
                 client.setClientId(clientModel.getClientId());
+                client.setDescription(clientModel.getDescription());
                 rep.add(client);
             }
         }
@@ -80,7 +81,9 @@ public class ClientsResource {
     }
 
     /**
-     * Create a new client.  Client client_id must be unique!
+     * Create a new client
+     *
+     * Client's client_id must be unique!
      *
      * @param uriInfo
      * @param rep
@@ -112,7 +115,7 @@ public class ClientsResource {
     public ClientResource getClient(final @PathParam("id") String id) {
         ClientModel clientModel = realm.getClientById(id);
         if (clientModel == null) {
-            throw new NotFoundException("Could not find client: " + id);
+            throw new NotFoundException("Could not find client");
         }
 
         session.getContext().setClient(clientModel);

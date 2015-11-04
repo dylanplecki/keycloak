@@ -4,7 +4,7 @@ import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
 
 import org.keycloak.connections.mongo.api.context.MongoStoreInvocationContext;
-import org.keycloak.enums.SslRequired;
+import org.keycloak.common.enums.SslRequired;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.AuthenticatorConfigModel;
@@ -311,6 +311,16 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
         updateRealm();
     }
 
+    @Override
+    public boolean isRevokeRefreshToken() {
+        return realm.isRevokeRefreshToken();
+    }
+
+    @Override
+    public void setRevokeRefreshToken(boolean revokeRefreshToken) {
+        realm.setRevokeRefreshToken(revokeRefreshToken);
+        updateRealm();
+    }
 
     @Override
     public int getSsoSessionIdleTimeout() {
@@ -331,6 +341,17 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
     @Override
     public void setSsoSessionMaxLifespan(int seconds) {
         realm.setSsoSessionMaxLifespan(seconds);
+        updateRealm();
+    }
+
+    @Override
+    public int getOfflineSessionIdleTimeout() {
+        return realm.getOfflineSessionIdleTimeout();
+    }
+
+    @Override
+    public void setOfflineSessionIdleTimeout(int seconds) {
+        realm.setOfflineSessionIdleTimeout(seconds);
         updateRealm();
     }
 
@@ -1649,6 +1670,7 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
         RequiredActionProviderEntity auth = new RequiredActionProviderEntity();
         auth.setId(KeycloakModelUtils.generateId());
         auth.setAlias(model.getAlias());
+        auth.setName(model.getName());
         auth.setProviderId(model.getProviderId());
         auth.setConfig(model.getConfig());
         auth.setEnabled(model.isEnabled());
@@ -1679,6 +1701,7 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
         model.setId(entity.getId());
         model.setProviderId(entity.getProviderId());
         model.setAlias(entity.getAlias());
+        model.setName(entity.getName());
         model.setEnabled(entity.isEnabled());
         model.setDefaultAction(entity.isDefaultAction());
         Map<String, String> config = new HashMap<>();

@@ -1,0 +1,28 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <parent>
+        <artifactId>keycloak-parent</artifactId>
+        <groupId>org.keycloak</groupId>
+        <version>1.7.0.Final-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <name>SAML Adapters Distribution Parent</name>
+    <description/>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>keycloak-saml-adapters-distribution-parent</artifactId>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>wf9-adapter</module>
+        <module>tomcat6-adapter-zip</module>
+        <module>tomcat7-adapter-zip</module>
+        <module>tomcat8-adapter-zip</module>
+        <module>jetty81-adapter-zip</module>
+        <!-- jetty 9.1 doesn't work right now
+        <module>jetty91-adapter-zip</module> -->
+        <module>jetty92-adapter-zip</module>
+        <module>as7-eap6-adapter</module>
+    </modules>
+</project>

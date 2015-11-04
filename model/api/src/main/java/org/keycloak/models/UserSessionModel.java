@@ -9,6 +9,7 @@ import java.util.Map;
 public interface UserSessionModel {
 
     String getId();
+    RealmModel getRealm();
 
     /**
      * If created via a broker external login, this is an identifier that can be
@@ -40,6 +41,7 @@ public interface UserSessionModel {
     public String getNote(String name);
     public void setNote(String name, String value);
     public void removeNote(String name);
+    public Map<String, String> getNotes();
 
     State getState();
     void setState(State state);

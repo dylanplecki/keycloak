@@ -17,7 +17,7 @@
 package org.keycloak.models.file.adapter;
 
 import org.keycloak.connections.file.InMemoryModel;
-import org.keycloak.enums.SslRequired;
+import org.keycloak.common.enums.SslRequired;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.AuthenticatorConfigModel;
@@ -326,6 +326,16 @@ public class RealmAdapter implements RealmModel {
 
 
     @Override
+    public boolean isRevokeRefreshToken() {
+        return realm.isRevokeRefreshToken();
+    }
+
+    @Override
+    public void setRevokeRefreshToken(boolean revokeRefreshToken) {
+        realm.setRevokeRefreshToken(revokeRefreshToken);
+    }
+
+    @Override
     public int getSsoSessionIdleTimeout() {
         return realm.getSsoSessionIdleTimeout();
     }
@@ -343,6 +353,16 @@ public class RealmAdapter implements RealmModel {
     @Override
     public void setSsoSessionMaxLifespan(int seconds) {
         realm.setSsoSessionMaxLifespan(seconds);
+    }
+
+    @Override
+    public int getOfflineSessionIdleTimeout() {
+        return realm.getOfflineSessionIdleTimeout();
+    }
+
+    @Override
+    public void setOfflineSessionIdleTimeout(int seconds) {
+        realm.setOfflineSessionIdleTimeout(seconds);
     }
 
     @Override

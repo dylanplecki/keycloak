@@ -5,9 +5,7 @@ import org.jboss.resteasy.annotations.cache.NoCache;
 import org.jboss.resteasy.spi.BadRequestException;
 import org.jboss.resteasy.spi.NotFoundException;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
-import org.keycloak.ClientConnection;
-import org.keycloak.authentication.RequiredActionFactory;
-import org.keycloak.authentication.RequiredActionProvider;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.events.Event;
 import org.keycloak.events.EventQuery;
 import org.keycloak.events.EventStoreProvider;
@@ -15,7 +13,8 @@ import org.keycloak.events.EventType;
 import org.keycloak.events.admin.AdminEvent;
 import org.keycloak.events.admin.AdminEventQuery;
 import org.keycloak.events.admin.OperationType;
-import org.keycloak.exportimport.ClientImporter;
+import org.keycloak.exportimport.ClientDescriptionConverter;
+import org.keycloak.exportimport.ClientDescriptionConverterFactory;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ModelDuplicateException;
@@ -29,6 +28,7 @@ import org.keycloak.models.utils.RepresentationToModel;
 import org.keycloak.protocol.oidc.TokenManager;
 import org.keycloak.provider.ProviderFactory;
 import org.keycloak.representations.adapters.action.GlobalRequestResult;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RealmEventsConfigRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.services.managers.AuthenticationManager;
@@ -102,10 +102,18 @@ public class RealmAdminResource {
      *
      * @return
      */
-    @Path("client-importers/{formatId}")
-    public Object getClientImporter(@PathParam("formatId") String formatId) {
-        ClientImporter importer = session.getProvider(ClientImporter.class, formatId);
-        return importer.createJaxrsService(realm, auth);
+    @Path("client-description-converter")
+    @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
+    @POST
+    @Produces(MediaType.APPLICATION_JSON)
+    public ClientRepresentation convertClientDescription(String description) {
+        for (ProviderFactory<ClientDescriptionConverter> factory : session.getKeycloakSessionFactory().getProviderFactories(ClientDescriptionConverter.class)) {
+            if (((ClientDescriptionConverterFactory) factory).isSupported(description)) {
+                return factory.create(session).convertToInternal(description);
+            }
+        }
+
+        throw new BadRequestException("Unsupported format");
     }
 
     /**
@@ -114,7 +122,7 @@ public class RealmAdminResource {
      * @return
      */
     @Path("attack-detection")
-    public AttackDetectionResource getClientImporter() {
+    public AttackDetectionResource getAttackDetection() {
         AttackDetectionResource resource = new AttackDetectionResource(auth, realm, adminEvent);
         ResteasyProviderFactory.getInstance().injectProperties(resource);
         return resource;
@@ -143,7 +151,9 @@ public class RealmAdminResource {
     }
 
     /**
-     * Get the top-level representation of the realm.  It will not include nested information like User and Client representations.
+     * Get the top-level representation of the realm
+     *
+     * It will not include nested information like User and Client representations.
      *
      * @return
      */
@@ -172,7 +182,9 @@ public class RealmAdminResource {
     }
 
     /**
-     * Update the top-level information of this realm.  Any user, roles or client information in the representation
+     * Update the top-level information of the realm
+     *
+     * Any user, roles or client information in the representation
      * will be ignored.  This will only update top-level attributes of the realm.
      *
      * @param rep
@@ -215,7 +227,7 @@ public class RealmAdminResource {
     }
 
     /**
-     * Delete this realm.
+     * Delete the realm
      *
      */
     @DELETE
@@ -260,7 +272,7 @@ public class RealmAdminResource {
     }
 
     /**
-     * Path for managing all realm-level or client-level roles defined in this realm by it's id.
+     * Path for managing all realm-level or client-level roles defined in this realm by its id.
      *
      * @return
      */
@@ -316,8 +328,10 @@ public class RealmAdminResource {
     }
 
     /**
+     * Get client session stats
+     *
      * Returns a JSON map.  The key is the client id, the value is the number of sessions that currently are active
-     * with that client.  Only client's that actually have a session associated with them will be in this map.
+     * with that client.  Only clients that actually have a session associated with them will be in this map.
      *
      * @return
      */
@@ -341,7 +355,9 @@ public class RealmAdminResource {
     }
 
     /**
-     * View the events provider and how it is configured.
+     * Get the events provider configuration
+     *
+     * Returns JSON object with events provider configuration
      *
      * @return
      */
@@ -352,11 +368,22 @@ public class RealmAdminResource {
     public RealmEventsConfigRepresentation getRealmEventsConfig() {
         auth.init(RealmAuth.Resource.EVENTS).requireView();
 
-        return ModelToRepresentation.toEventsConfigReprensetation(realm);
+        RealmEventsConfigRepresentation config = ModelToRepresentation.toEventsConfigReprensetation(realm);
+        if (config.getEnabledEventTypes() == null || config.getEnabledEventTypes().isEmpty()) {
+            config.setEnabledEventTypes(new LinkedList<String>());
+            for (EventType e : EventType.values()) {
+                if (e.isSaveByDefault()) {
+                    config.getEnabledEventTypes().add(e.name());
+                }
+            }
+        }
+        return config;
     }
 
     /**
-     * Change the events provider and/or it's configuration
+     * Update the events provider
+     *
+     * Change the events provider and/or its configuration
      *
      * @param rep
      */
@@ -371,15 +398,17 @@ public class RealmAdminResource {
     }
 
     /**
-     * Query events.  Returns all events, or will query based on URL query parameters listed here
+     * Get events
      *
-     * @param client app or oauth client name
-     * @param user user id
-     * @param ipAddress
-     * @param dateTo
-     * @param dateFrom
-     * @param firstResult
-     * @param maxResults
+     * Returns all events, or filters them based on URL query parameters listed here
+     *
+     * @param client App or oauth client name
+     * @param user User id
+     * @param ipAddress IP address
+     * @param dateTo To date
+     * @param dateFrom From date
+     * @param firstResult Paging offset
+     * @param maxResults Paging size
      * @return
      */
     @Path("events")
@@ -448,7 +477,9 @@ public class RealmAdminResource {
     }
     
     /**
-     * Query admin events.  Returns all admin events, or will query based on URL query parameters listed here
+     * Get admin events
+     *
+     * Returns all admin events, or filters events based on URL query parameters listed here
      *
      * @param authRealm
      * @param authClient
@@ -538,7 +569,7 @@ public class RealmAdminResource {
     }
 
     /**
-     * Delete all events.
+     * Delete all events
      *
      */
     @Path("events")
@@ -551,7 +582,7 @@ public class RealmAdminResource {
     }
     
     /**
-     * Delete all admin events.
+     * Delete all admin events
      *
      */
     @Path("admin-events")
@@ -563,6 +594,15 @@ public class RealmAdminResource {
         eventStore.clearAdmin(realm.getId());
     }
 
+    /**
+     * Test LDAP connection
+     *
+     * @param action
+     * @param connectionUrl
+     * @param bindDn
+     * @param bindCredential
+     * @return
+     */
     @Path("testLDAPConnection")
     @GET
     @NoCache

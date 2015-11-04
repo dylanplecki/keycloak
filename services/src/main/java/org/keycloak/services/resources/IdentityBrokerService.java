@@ -20,7 +20,7 @@ package org.keycloak.services.resources;
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.spi.HttpRequest;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.authentication.AuthenticationProcessor;
 import org.keycloak.broker.provider.AuthenticationRequest;
 import org.keycloak.broker.provider.BrokeredIdentityContext;
@@ -45,14 +45,12 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
-import org.keycloak.models.utils.DefaultAuthenticationFlows;
 import org.keycloak.models.utils.FormMessage;
 import org.keycloak.protocol.oidc.TokenManager;
 import org.keycloak.provider.ProviderFactory;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
 import org.keycloak.services.managers.AppAuthManager;
-import org.keycloak.services.managers.AuthenticationManager;
 import org.keycloak.services.managers.AuthenticationManager.AuthResult;
 import org.keycloak.services.managers.BruteForceProtector;
 import org.keycloak.services.managers.ClientSessionCode;
@@ -62,13 +60,9 @@ import org.keycloak.services.ErrorPage;
 import org.keycloak.services.Urls;
 import org.keycloak.services.validation.Validation;
 import org.keycloak.social.SocialIdentityProvider;
-import org.keycloak.util.ObjectUtil;
+import org.keycloak.common.util.ObjectUtil;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.OPTIONS;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.QueryParam;
+import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -128,6 +122,12 @@ public class IdentityBrokerService implements IdentityProvider.AuthenticationCal
 
     public void init() {
         this.event = new EventBuilder(realmModel, session, clientConnection).event(EventType.IDENTITY_PROVIDER_LOGIN);
+    }
+
+    @POST
+    @Path("/{provider_id}/login")
+    public Response performPostLogin(@PathParam("provider_id") String providerId, @QueryParam("code") String code) {
+        return performLogin(providerId, code);
     }
 
     @GET
@@ -320,8 +320,7 @@ public class IdentityBrokerService implements IdentityProvider.AuthenticationCal
             LOGGER.debugf("Performing local authentication for user [%s].", federatedUser);
         }
 
-        return AuthenticationManager.nextActionAfterAuthentication(this.session, userSession, clientSession, this.clientConnection, this.request,
-                this.uriInfo, event);
+        return AuthenticationProcessor.createRequiredActionRedirect(realmModel, clientSession, uriInfo);
     }
 
     @Override

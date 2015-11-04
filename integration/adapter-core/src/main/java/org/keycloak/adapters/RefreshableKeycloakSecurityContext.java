@@ -3,7 +3,7 @@ package org.keycloak.adapters;
 import org.jboss.logging.Logger;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.RSATokenVerifier;
-import org.keycloak.VerificationException;
+import org.keycloak.common.VerificationException;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.AccessTokenResponse;
 import org.keycloak.representations.IDToken;
@@ -117,7 +117,12 @@ public class RefreshableKeycloakSecurityContext extends KeycloakSecurityContext 
         }
 
         this.token = token;
-        this.refreshToken = response.getRefreshToken();
+        if (response.getRefreshToken() != null) {
+            if (log.isTraceEnabled()) {
+                log.trace("Setup new refresh token to the security context");
+            }
+            this.refreshToken = response.getRefreshToken();
+        }
         this.tokenString = tokenString;
         tokenStore.refreshCallback(this);
         return true;

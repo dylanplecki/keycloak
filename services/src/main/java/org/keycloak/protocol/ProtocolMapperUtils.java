@@ -1,12 +1,13 @@
 package org.keycloak.protocol;
 
-import org.keycloak.models.KeycloakSessionFactory;
+import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.UserModel;
-import org.keycloak.representations.AccessToken;
+import org.keycloak.protocol.oidc.OIDCLoginProtocol;
+import org.keycloak.protocol.oidc.OIDCLoginProtocolFactory;
+import org.keycloak.provider.ProviderFactory;
 
 import java.lang.reflect.Method;
-import java.util.List;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -16,14 +17,14 @@ public class ProtocolMapperUtils {
     public static final String USER_ATTRIBUTE = "user.attribute";
     public static final String USER_SESSION_NOTE = "user.session.note";
     public static final String MULTIVALUED = "multivalued";
-    public static final String USER_MODEL_PROPERTY_LABEL = "User Property";
-    public static final String USER_MODEL_PROPERTY_HELP_TEXT = "Name of the property method in the UserModel interface.  For example, a value of 'email' would reference the UserModel.getEmail() method.";
-    public static final String USER_MODEL_ATTRIBUTE_LABEL = "User Attribute";
-    public static final String USER_MODEL_ATTRIBUTE_HELP_TEXT = "Name of stored user attribute which is the name of an attribute within the UserModel.attribute map.";
-    public static final String USER_SESSION_MODEL_NOTE_LABEL = "User Session Note";
-    public static final String USER_SESSION_MODEL_NOTE_HELP_TEXT = "Name of stored user session note within the UserSessionModel.note map.";
-    public static final String MULTIVALUED_LABEL = "Multivalued";
-    public static final String MULTIVALUED_HELP_TEXT = "Indicates if attribute supports multiple values. If true, then the list of all values of this attribute will be set as claim. If false, then just first value will be set as claim";
+    public static final String USER_MODEL_PROPERTY_LABEL = "usermodel.prop.label";
+    public static final String USER_MODEL_PROPERTY_HELP_TEXT = "usermodel.prop.tooltip";
+    public static final String USER_MODEL_ATTRIBUTE_LABEL = "usermodel.attr.label";
+    public static final String USER_MODEL_ATTRIBUTE_HELP_TEXT = "usermodel.attr.tooltip";
+    public static final String USER_SESSION_MODEL_NOTE_LABEL = "userSession.modelNote.label";
+    public static final String USER_SESSION_MODEL_NOTE_HELP_TEXT = "userSession.modelNote.tooltip";
+    public static final String MULTIVALUED_LABEL = "multivalued.label";
+    public static final String MULTIVALUED_HELP_TEXT = "multivalued.tooltip";
 
     public static String getUserModelValue(UserModel user, String propertyName) {
 
@@ -58,5 +59,26 @@ public class ProtocolMapperUtils {
             return rtn;
 
         }
+    }
+
+    /**
+     * Find the builtin locale mapper.
+     *
+     * @param session A KeycloakSession
+     * @return The builtin locale mapper.
+     */
+    public static ProtocolMapperModel findLocaleMapper(KeycloakSession session) {
+        ProtocolMapperModel found = null;
+        for (ProviderFactory p : session.getKeycloakSessionFactory().getProviderFactories(LoginProtocol.class)) {
+            LoginProtocolFactory factory = (LoginProtocolFactory) p;
+            for (ProtocolMapperModel mapper : factory.getBuiltinMappers()) {
+                if (mapper.getName().equals(OIDCLoginProtocolFactory.LOCALE) && mapper.getProtocol().equals(OIDCLoginProtocol.LOGIN_PROTOCOL)) {
+                    found = mapper;
+                    break;
+                }
+            }
+            if (found != null) break;
+        }
+        return found;
     }
 }

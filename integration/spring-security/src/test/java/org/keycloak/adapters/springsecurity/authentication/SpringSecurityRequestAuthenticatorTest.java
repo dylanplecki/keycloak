@@ -5,10 +5,10 @@ import org.junit.Test;
 import org.keycloak.KeycloakPrincipal;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.AdapterTokenStore;
-import org.keycloak.adapters.HttpFacade;
-import org.keycloak.adapters.KeycloakAccount;
+import org.keycloak.adapters.spi.HttpFacade;
 import org.keycloak.adapters.KeycloakDeployment;
 import org.keycloak.adapters.OAuthRequestAuthenticator;
+import org.keycloak.adapters.OidcKeycloakAccount;
 import org.keycloak.adapters.RefreshableKeycloakSecurityContext;
 import org.keycloak.adapters.springsecurity.facade.SimpleHttpFacade;
 import org.keycloak.adapters.springsecurity.token.KeycloakAuthenticationToken;
@@ -82,7 +82,7 @@ public class SpringSecurityRequestAuthenticatorTest {
     public void testCompleteOAuthAuthentication() throws Exception {
         authenticator.completeOAuthAuthentication(principal);
         verify(request).setAttribute(eq(KeycloakSecurityContext.class.getName()), eq(refreshableKeycloakSecurityContext));
-        verify(tokenStore).saveAccountInfo(any(KeycloakAccount.class)); // FIXME: should verify account
+        verify(tokenStore).saveAccountInfo(any(OidcKeycloakAccount.class)); // FIXME: should verify account
     }
 
     @Test

@@ -2,7 +2,7 @@ package org.keycloak.protocol.oidc.endpoints;
 
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.spi.HttpRequest;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.authentication.AuthenticationProcessor;
 import org.keycloak.constants.AdapterConstants;
@@ -17,16 +17,15 @@ import org.keycloak.models.ClientSessionModel;
 import org.keycloak.models.IdentityProviderModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
-import org.keycloak.models.utils.DefaultAuthenticationFlows;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.protocol.RestartLoginCookie;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.utils.RedirectUtils;
 import org.keycloak.services.ErrorPageException;
+import org.keycloak.services.Urls;
 import org.keycloak.services.managers.AuthenticationManager;
 import org.keycloak.services.managers.ClientSessionCode;
 import org.keycloak.services.messages.Messages;
-import org.keycloak.services.Urls;
 import org.keycloak.services.resources.LoginActionsService;
 
 import javax.ws.rs.GET;
@@ -46,7 +45,7 @@ public class AuthorizationEndpoint {
     public static final String CODE_AUTH_TYPE = "code";
 
     private enum Action {
-        REGISTER, CODE
+        REGISTER, CODE, FORGOT_CREDENTIALS
     }
 
     @Context
@@ -118,6 +117,8 @@ public class AuthorizationEndpoint {
         switch (action) {
             case REGISTER:
                 return buildRegister();
+            case FORGOT_CREDENTIALS:
+                return buildForgotCredential();
             case CODE:
                 return buildAuthorizationCodeAuthorizationResponse();
         }
@@ -145,6 +146,17 @@ public class AuthorizationEndpoint {
         return this;
     }
 
+    public AuthorizationEndpoint forgotCredentials() {
+        event.event(EventType.RESET_PASSWORD);
+        action = Action.FORGOT_CREDENTIALS;
+
+        if (!realm.isResetPasswordAllowed()) {
+            throw new ErrorPageException(session, Messages.RESET_CREDENTIAL_NOT_ALLOWED);
+        }
+
+        return this;
+    }
+
     private void checkSsl() {
         if (!uriInfo.getBaseUri().getScheme().equals("https") && realm.getSslRequired().isRequired(clientConnection)) {
             event.error(Errors.SSL_REQUIRED);
@@ -162,7 +174,7 @@ public class AuthorizationEndpoint {
     private void checkClient() {
         if (clientId == null) {
             event.error(Errors.INVALID_REQUEST);
-            throw new ErrorPageException(session, Messages.MISSING_PARAMETER, OIDCLoginProtocol.CLIENT_ID_PARAM );
+            throw new ErrorPageException(session, Messages.MISSING_PARAMETER, OIDCLoginProtocol.CLIENT_ID_PARAM);
         }
 
         event.client(clientId);
@@ -170,12 +182,12 @@ public class AuthorizationEndpoint {
         client = realm.getClientByClientId(clientId);
         if (client == null) {
             event.error(Errors.CLIENT_NOT_FOUND);
-            throw new ErrorPageException(session, Messages.CLIENT_NOT_FOUND );
+            throw new ErrorPageException(session, Messages.CLIENT_NOT_FOUND);
         }
 
         if (client.isBearerOnly()) {
             event.error(Errors.NOT_ALLOWED);
-            throw new ErrorPageException(session, Messages.BEARER_ONLY );
+            throw new ErrorPageException(session, Messages.BEARER_ONLY);
         }
 
         if (client.isDirectGrantsOnly()) {
@@ -192,7 +204,7 @@ public class AuthorizationEndpoint {
                 responseType = legacyResponseType;
             } else {
                 event.error(Errors.INVALID_REQUEST);
-                throw new ErrorPageException(session, Messages.MISSING_PARAMETER, OIDCLoginProtocol.RESPONSE_TYPE_PARAM );
+                throw new ErrorPageException(session, Messages.MISSING_PARAMETER, OIDCLoginProtocol.RESPONSE_TYPE_PARAM);
             }
         }
 
@@ -204,7 +216,7 @@ public class AuthorizationEndpoint {
             }
         } else {
             event.error(Errors.INVALID_REQUEST);
-            throw new ErrorPageException(session, Messages.INVALID_PARAMETER, OIDCLoginProtocol.RESPONSE_TYPE_PARAM );
+            throw new ErrorPageException(session, Messages.INVALID_PARAMETER, OIDCLoginProtocol.RESPONSE_TYPE_PARAM);
         }
     }
 
@@ -266,9 +278,74 @@ public class AuthorizationEndpoint {
 
         AuthenticationFlowModel flow = realm.getBrowserFlow();
         String flowId = flow.getId();
+        AuthenticationProcessor processor = createProcessor(flowId, LoginActionsService.AUTHENTICATE_PATH);
+
+        if (prompt != null && prompt.equals("none")) {
+            // OIDC prompt == NONE
+            // This means that client is just checking if the user is already completely logged in.
+            //
+            // here we cancel login if any authentication action or required action is required
+            Response challenge = null;
+            try {
+                challenge = processor.authenticateOnly();
+                if (challenge == null) {
+                    challenge = processor.attachSessionExecutionRequiredActions();
+                }
+            } catch (Exception e) {
+                return processor.handleBrowserException(e);
+            }
+
+            if (challenge != null) {
+                if (processor.isUserSessionCreated()) {
+                    session.sessions().removeUserSession(realm, processor.getUserSession());
+                }
+                OIDCLoginProtocol oauth = new OIDCLoginProtocol(session, realm, uriInfo, headers, event);
+                return oauth.cancelLogin(clientSession);
+            }
+
+            if (challenge == null) {
+                return processor.finishAuthentication();
+            } else {
+                RestartLoginCookie.setRestartCookie(realm, clientConnection, uriInfo, clientSession);
+                return challenge;
+            }
+        } else {
+            try {
+                RestartLoginCookie.setRestartCookie(realm, clientConnection, uriInfo, clientSession);
+                return processor.authenticate();
+            } catch (Exception e) {
+                return processor.handleBrowserException(e);
+            }
+
+        }
+    }
+
+    private Response buildRegister() {
+        authManager.expireIdentityCookie(realm, uriInfo, clientConnection);
+
+        AuthenticationFlowModel flow = realm.getRegistrationFlow();
+        String flowId = flow.getId();
+
+        AuthenticationProcessor processor = createProcessor(flowId, LoginActionsService.REGISTRATION_PATH);
+
+        return processor.authenticate();
+    }
+
+    private Response buildForgotCredential() {
+        authManager.expireIdentityCookie(realm, uriInfo, clientConnection);
+
+        AuthenticationFlowModel flow = realm.getResetCredentialsFlow();
+        String flowId = flow.getId();
+
+        AuthenticationProcessor processor = createProcessor(flowId, LoginActionsService.RESET_CREDENTIALS_PATH);
+
+        return processor.authenticate();
+    }
+
+    private AuthenticationProcessor createProcessor(String flowId, String flowPath) {
         AuthenticationProcessor processor = new AuthenticationProcessor();
         processor.setClientSession(clientSession)
-                .setFlowPath(LoginActionsService.AUTHENTICATE_PATH)
+                .setFlowPath(flowPath)
                 .setFlowId(flowId)
                 .setConnection(clientConnection)
                 .setEventBuilder(event)
@@ -277,39 +354,7 @@ public class AuthorizationEndpoint {
                 .setSession(session)
                 .setUriInfo(uriInfo)
                 .setRequest(request);
-
-        Response challenge = null;
-        try {
-            challenge = processor.authenticateOnly();
-            if (challenge == null) {
-                challenge = processor.attachSessionExecutionRequiredActions();
-            }
-        } catch (Exception e) {
-            return processor.handleBrowserException(e);
-        }
-
-        if (challenge != null && prompt != null && prompt.equals("none")) {
-            if (processor.isUserSessionCreated()) {
-                session.sessions().removeUserSession(realm, processor.getUserSession());
-            }
-            OIDCLoginProtocol oauth = new OIDCLoginProtocol(session, realm, uriInfo, headers, event);
-            return oauth.cancelLogin(clientSession);
-        }
-
-        if (challenge == null) {
-            return processor.finishAuthentication();
-        } else {
-            RestartLoginCookie.setRestartCookie(realm, clientConnection, uriInfo, clientSession);
-            return challenge;
-        }
-    }
-
-    private Response buildRegister() {
-        authManager.expireIdentityCookie(realm, uriInfo, clientConnection);
-
-        return session.getProvider(LoginFormsProvider.class)
-                .setClientSessionCode(new ClientSessionCode(realm, clientSession).getCode())
-                .createRegistration();
+        return processor;
     }
 
     private Response buildRedirectToIdentityProvider(String providerId, String accessCode) {

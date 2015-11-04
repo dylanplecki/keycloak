@@ -19,8 +19,8 @@
         <module name="org.keycloak.keycloak-connections-mongo" services="import"/>
         <module name="org.keycloak.keycloak-connections-mongo-update" services="import"/>
         <module name="org.keycloak.keycloak-connections-file" services="import"/>
+        <module name="org.keycloak.keycloak-common" services="import"/>
         <module name="org.keycloak.keycloak-core" services="import"/>
-        <module name="org.keycloak.keycloak-core-jaxrs" services="import"/>
         <module name="org.keycloak.keycloak-email-api" services="import"/>
         <module name="org.keycloak.keycloak-email-freemarker" services="import"/>
         <module name="org.keycloak.keycloak-events-api" services="import"/>
@@ -31,7 +31,6 @@
         <module name="org.keycloak.keycloak-export-import-api" services="import"/>
         <module name="org.keycloak.keycloak-export-import-dir" services="import"/>
         <module name="org.keycloak.keycloak-export-import-single-file" services="import"/>
-        <module name="org.keycloak.keycloak-export-import-zip" services="import"/>
         <module name="org.keycloak.keycloak-forms-common-freemarker" services="import"/>
         <module name="org.keycloak.keycloak-forms-common-themes" services="import"/>
         <module name="org.keycloak.keycloak-invalidation-cache-infinispan" services="import"/>
@@ -72,7 +71,6 @@
         <module name="com.google.zxing.javase"/>
         <module name="org.jboss.logging"/>
         <module name="org.bouncycastle" />
-        <module name="net.iharder.base64"/>
         <module name="javax.api"/>
         <module name="javax.activation.api"/>
         <module name="org.apache.httpcomponents"/>

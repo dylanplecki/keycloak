@@ -7,12 +7,36 @@ var configUrl = consoleBaseUrl + "/config";
 
 var auth = {};
 
-var module = angular.module('keycloak', [ 'keycloak.services', 'keycloak.loaders', 'ui.bootstrap', 'ui.select2', 'angularFileUpload' ]);
+var module = angular.module('keycloak', [ 'keycloak.services', 'keycloak.loaders', 'ui.bootstrap', 'ui.select2', 'angularFileUpload', 'pascalprecht.translate', 'ngCookies', 'ngSanitize']);
 var resourceRequests = 0;
 var loadingTimer = -1;
 
 angular.element(document).ready(function () {
     var keycloakAuth = new Keycloak(configUrl);
+
+    function whoAmI(success, error) {
+        var req = new XMLHttpRequest();
+        req.open('GET', consoleBaseUrl + "/whoami", true);
+        req.setRequestHeader('Accept', 'application/json');
+        req.setRequestHeader('Authorization', 'bearer ' + keycloakAuth.token);
+
+        req.onreadystatechange = function () {
+            if (req.readyState == 4) {
+                if (req.status == 200) {
+                    var data = JSON.parse(req.responseText);
+                    success(data);
+                } else {
+                    error();
+                }
+            }
+        }
+
+        req.send();
+    }
+
+    function hasAnyAccess(user) {
+        return user && user['realm_access'];
+    }
 
     keycloakAuth.onAuthLogout = function() {
         location.reload();
@@ -20,10 +44,27 @@ angular.element(document).ready(function () {
 
     keycloakAuth.init({ onLoad: 'login-required' }).success(function () {
         auth.authz = keycloakAuth;
-        module.factory('Auth', function() {
-            return auth;
+
+        auth.refreshPermissions = function(success, error) {
+            whoAmI(function(data) {
+                auth.user = data;
+                auth.loggedIn = true;
+                auth.hasAnyAccess = hasAnyAccess(data);
+
+                success();
+            }, function() {
+                error();
+            });
+        };
+
+        auth.refreshPermissions(function() {
+            module.factory('Auth', function() {
+                return auth;
+            });
+            angular.bootstrap(document, ["keycloak"]);
+        }, function() {
+            window.location.reload();
         });
-        angular.bootstrap(document, ["keycloak"]);
     }).error(function () {
         window.location.reload();
     });
@@ -52,8 +93,18 @@ module.factory('authInterceptor', function($q, Auth) {
     };
 });
 
-
-
+module.config(['$translateProvider', function($translateProvider) {
+    $translateProvider.useSanitizeValueStrategy('sanitizeParameters');
+    
+    var locale = auth.authz.idTokenParsed.locale;
+    if (locale !== undefined) {
+        $translateProvider.preferredLanguage(locale);
+    } else {
+        $translateProvider.preferredLanguage('en');
+    }
+    
+    $translateProvider.useUrlLoader('messages.json');
+}]);
 
 module.config([ '$routeProvider', function($routeProvider) {
     $routeProvider
@@ -447,6 +498,24 @@ module.config([ '$routeProvider', function($routeProvider) {
             },
             controller : 'UserConsentsCtrl'
         })
+        .when('/realms/:realm/users/:user/offline-sessions/:client', {
+            templateUrl : resourceUrl + '/partials/user-offline-sessions.html',
+            resolve : {
+                realm : function(RealmLoader) {
+                    return RealmLoader();
+                },
+                user : function(UserLoader) {
+                    return UserLoader();
+                },
+                client : function(ClientLoader) {
+                    return ClientLoader();
+                },
+                offlineSessions : function(UserOfflineSessionsLoader) {
+                    return UserOfflineSessionsLoader();
+                }
+            },
+            controller : 'UserOfflineSessionsCtrl'
+        })
         .when('/realms/:realm/users', {
             templateUrl : resourceUrl + '/partials/user-list.html',
             resolve : {
@@ -627,6 +696,21 @@ module.config([ '$routeProvider', function($routeProvider) {
             },
             controller : 'ClientSessionsCtrl'
         })
+        .when('/realms/:realm/clients/:client/offline-access', {
+            templateUrl : resourceUrl + '/partials/client-offline-sessions.html',
+            resolve : {
+                realm : function(RealmLoader) {
+                    return RealmLoader();
+                },
+                client : function(ClientLoader) {
+                    return ClientLoader();
+                },
+                offlineSessionCount : function(ClientOfflineSessionCountLoader) {
+                    return ClientOfflineSessionCountLoader();
+                }
+            },
+            controller : 'ClientOfflineSessionsCtrl'
+        })
         .when('/realms/:realm/clients/:client/credentials', {
             templateUrl : resourceUrl + '/partials/client-credentials.html',
             resolve : {
@@ -638,48 +722,12 @@ module.config([ '$routeProvider', function($routeProvider) {
                 },
                 clientAuthenticatorProviders : function(ClientAuthenticatorProvidersLoader) {
                     return ClientAuthenticatorProvidersLoader();
-                }
-            },
-            controller : 'ClientCredentialsCtrl'
-        })
-        .when('/realms/:realm/clients/:client/credentials/client-secret', {
-            templateUrl : resourceUrl + '/partials/client-credentials-secret.html',
-            resolve : {
-                realm : function(RealmLoader) {
-                    return RealmLoader();
-                },
-                client : function(ClientLoader) {
-                    return ClientLoader();
-                }
-            },
-            controller : 'ClientSecretCtrl'
-        })
-        .when('/realms/:realm/clients/:client/credentials/client-jwt', {
-            templateUrl : resourceUrl + '/partials/client-credentials-jwt.html',
-            resolve : {
-                realm : function(RealmLoader) {
-                    return RealmLoader();
-                },
-                client : function(ClientLoader) {
-                    return ClientLoader();
-                }
-            },
-            controller : 'ClientSignedJWTCtrl'
-        })
-        .when('/realms/:realm/clients/:client/credentials/:provider', {
-            templateUrl : resourceUrl + '/partials/client-credentials-generic.html',
-            resolve : {
-                realm : function(RealmLoader) {
-                    return RealmLoader();
-                },
-                client : function(ClientLoader) {
-                    return ClientLoader();
                 },
                 clientConfigProperties: function(PerClientAuthenticationConfigDescriptionLoader) {
                     return PerClientAuthenticationConfigDescriptionLoader();
                 }
             },
-            controller : 'ClientGenericCredentialsCtrl'
+            controller : 'ClientCredentialsCtrl'
         })
         .when('/realms/:realm/clients/:client/credentials/client-jwt/:keyType/import/:attribute', {
             templateUrl : resourceUrl + '/partials/client-credentials-jwt-key-import.html',
@@ -1504,7 +1552,7 @@ module.directive('onoffswitch', function() {
 });
 
 /**
- * Directive for presenting an ON-OFF switch for checkbox.
+ * Directive for presenting an ON-OFF switch for checkbox. The directive expects the value to be string 'true' or 'false', not boolean true/false
  * This directive provides some additional capabilities to the default onoffswitch such as:
  *
  * - Dynamic values for id and name attributes. Useful if you need to use this directive inside a ng-repeat
@@ -1512,7 +1560,7 @@ module.directive('onoffswitch', function() {
  *
  * Usage: <input ng-model="mmm" name="nnn" id="iii" kc-onoffswitch-model [on-text="ooo" off-text="fff"] />
  */
-module.directive('onoffswitchmodel', function() {
+module.directive('onoffswitchstring', function() {
     return {
         restrict: "EA",
         replace: true,
@@ -1527,7 +1575,7 @@ module.directive('onoffswitchmodel', function() {
         },
         // TODO - The same code acts differently when put into the templateURL. Find why and move the code there.
         //templateUrl: "templates/kc-switch.html",
-        template: "<span><div class='onoffswitch' tabindex='0'><input type='checkbox' ng-true-value='{{value}}' ng-model='ngModel' ng-disabled='ngDisabled' class='onoffswitch-checkbox' name='kc{{name}}' id='kc{{id}}'><label for='kc{{id}}' class='onoffswitch-label'><span class='onoffswitch-inner'><span class='onoffswitch-active'>{{kcOnText}}</span><span class='onoffswitch-inactive'>{{kcOffText}}</span></span><span class='onoffswitch-switch'></span></label></div></span>",
+        template: '<span><div class="onoffswitch" tabindex="0"><input type="checkbox" ng-true-value="\'true\'" ng-false-value="\'false\'" ng-model="ngModel" ng-disabled="ngDisabled" class="onoffswitch-checkbox" name="kc{{name}}" id="kc{{id}}"><label for="kc{{id}}" class="onoffswitch-label"><span class="onoffswitch-inner"><span class="onoffswitch-active">{{kcOnText}}</span><span class="onoffswitch-inactive">{{kcOffText}}</span></span><span class="onoffswitch-switch"></span></label></div></span>',
         compile: function(element, attrs) {
 
             if (!attrs.onText) { attrs.onText = "ON"; }
@@ -1546,12 +1594,13 @@ module.directive('onoffswitchmodel', function() {
 });
 
 /**
- * Directive for presenting an ON-OFF switch for checkbox.
+ * Directive for presenting an ON-OFF switch for checkbox. The directive expects the true-value or false-value to be string like 'true' or 'false', not boolean true/false.
  * This directive provides some additional capabilities to the default onoffswitch such as:
  *
- * - Specific scope to specify the value. Instead of just true or false.
+ * - Specific scope to specify the value. Instead of just 'true' or 'false' you can use any other values. For example: true-value="'foo'" false-value="'bar'" .
+ * But 'true'/'false' are defaults if true-value and false-value are not specified
  *
- * Usage: <input ng-model="mmm" name="nnn" id="iii" onoffswitchvalue [on-text="ooo" off-text="fff"] />
+ * Usage: <input ng-model="mmm" name="nnn" id="iii" onoffswitchvalue [ true-value="'true'" false-value="'false'" on-text="ooo" off-text="fff"] />
  */
 module.directive('onoffswitchvalue', function() {
     return {
@@ -1560,7 +1609,8 @@ module.directive('onoffswitchvalue', function() {
         scope: {
             name: '@',
             id: '@',
-            value: '=',
+            trueValue: '@',
+            falseValue: '@',
             ngModel: '=',
             ngDisabled: '=',
             kcOnText: '@onText',
@@ -1568,7 +1618,7 @@ module.directive('onoffswitchvalue', function() {
         },
         // TODO - The same code acts differently when put into the templateURL. Find why and move the code there.
         //templateUrl: "templates/kc-switch.html",
-        template: "<span><div class='onoffswitch' tabindex='0'><input type='checkbox' ng-true-value='{{value}}' ng-model='ngModel' ng-disabled='ngDisabled' class='onoffswitch-checkbox' name='{{name}}' id='{{id}}'><label for='{{id}}' class='onoffswitch-label'><span class='onoffswitch-inner'><span class='onoffswitch-active'>{{kcOnText}}</span><span class='onoffswitch-inactive'>{{kcOffText}}</span></span><span class='onoffswitch-switch'></span></label></div></span>",
+        template: "<span><div class='onoffswitch' tabindex='0'><input type='checkbox' ng-true-value='{{trueValue}}' ng-false-value='{{falseValue}}' ng-model='ngModel' ng-disabled='ngDisabled' class='onoffswitch-checkbox' name='{{name}}' id='{{id}}'><label for='{{id}}' class='onoffswitch-label'><span class='onoffswitch-inner'><span class='onoffswitch-active'>{{kcOnText}}</span><span class='onoffswitch-inactive'>{{kcOffText}}</span></span><span class='onoffswitch-switch'></span></label></div></span>",
         compile: function(element, attrs) {
             /*
              We don't want to propagate basic attributes to the root element of directive. Id should be passed to the
@@ -1576,6 +1626,9 @@ module.directive('onoffswitchvalue', function() {
              */
             element.removeAttr('name');
             element.removeAttr('id');
+
+            if (!attrs.trueValue) { attrs.trueValue = "'true'"; }
+            if (!attrs.falseValue) { attrs.falseValue = "'false'"; }
 
             if (!attrs.onText) { attrs.onText = "ON"; }
             if (!attrs.offText) { attrs.offText = "OFF"; }
@@ -1840,7 +1893,6 @@ module.directive('kcTabsUserFederation', function () {
 });
 
 module.controller('RoleSelectorModalCtrl', function($scope, realm, config, configName, RealmRoles, Client, ClientRole, $modalInstance) {
-    console.log('realm: ' + realm.realm);
     $scope.selectedRealmRole = {
         role: undefined
     };
@@ -1888,6 +1940,25 @@ module.controller('RoleSelectorModalCtrl', function($scope, realm, config, confi
     })
 });
 
+module.controller('ProviderConfigCtrl', function ($modal, $scope) {
+    $scope.openRoleSelector = function (configName, config) {
+        $modal.open({
+            templateUrl: resourceUrl + '/partials/modal/role-selector.html',
+            controller: 'RoleSelectorModalCtrl',
+            resolve: {
+                realm: function () {
+                    return $scope.realm;
+                },
+                config: function () {
+                    return config;
+                },
+                configName: function () {
+                    return configName;
+                }
+            }
+        })
+    }
+});
 
 module.directive('kcProviderConfig', function ($modal) {
     return {
@@ -1895,32 +1966,12 @@ module.directive('kcProviderConfig', function ($modal) {
             config: '=',
             properties: '=',
             realm: '=',
-            clients: '='
+            clients: '=',
+            configName: '='
         },
         restrict: 'E',
         replace: true,
-        link: function(scope, element, attrs) {
-            scope.openRoleSelector = function(configName) {
-                $modal.open({
-                    templateUrl: resourceUrl + '/partials/modal/role-selector.html',
-                    controller: 'RoleSelectorModalCtrl',
-                    resolve: {
-                        realm: function () {
-                            return scope.realm;
-                        },
-                        config: function() {
-                            return scope.config;
-                        },
-                        configName: function() {
-
-                            return configName;
-                        }
-                    }
-                })
-
-            };
-
-        },
+        controller: 'ProviderConfigCtrl',
         templateUrl: resourceUrl + '/templates/kc-provider-config.html'
     }
 });
@@ -1997,16 +2048,11 @@ module.filter('capitalize', function() {
         if (!input) {
             return;
         }
-        var result = input.substring(0, 1).toUpperCase();
-        var s = input.substring(1);
-        for (var i=0; i<s.length ; i++) {
-            var c = s[i];
-            if (c.match(/[A-Z]/)) {
-                result = result.concat(" ")
-            };
-            result = result.concat(c);
+        var splittedWords = input.split(/\s+/);
+        for (var i=0; i<splittedWords.length ; i++) {
+            splittedWords[i] = splittedWords[i].charAt(0).toUpperCase() + splittedWords[i].slice(1);
         };
-        return result;
+        return splittedWords.join(" ");
     };
 });
 
@@ -2072,5 +2118,28 @@ module.directive( 'kcOpen', function ( $location ) {
                 $location.path(path);
             });
         });
+    };
+});
+
+module.directive('kcOnReadFile', function ($parse) {
+    console.debug('kcOnReadFile');
+    return {
+        restrict: 'A',
+        scope: false,
+        link: function(scope, element, attrs) {
+            var fn = $parse(attrs.kcOnReadFile);
+
+            element.on('change', function(onChangeEvent) {
+                var reader = new FileReader();
+
+                reader.onload = function(onLoadEvent) {
+                    scope.$apply(function() {
+                        fn(scope, {$fileContent:onLoadEvent.target.result});
+                    });
+                };
+
+                reader.readAsText((onChangeEvent.srcElement || onChangeEvent.target).files[0]);
+            });
+        }
     };
 });

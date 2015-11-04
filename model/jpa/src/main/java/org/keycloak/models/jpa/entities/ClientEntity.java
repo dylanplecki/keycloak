@@ -34,12 +34,16 @@ public class ClientEntity {
     private String id;
     @Column(name = "NAME")
     private String name;
+    @Column(name = "DESCRIPTION")
+    private String description;
     @Column(name = "CLIENT_ID")
     private String clientId;
     @Column(name="ENABLED")
     private boolean enabled;
     @Column(name="SECRET")
     private String secret;
+    @Column(name="CLIENT_AUTHENTICATOR_TYPE")
+    private String clientAuthenticatorType;
     @Column(name="NOT_BEFORE")
     private int notBefore;
     @Column(name="PUBLIC_CLIENT")
@@ -79,6 +83,9 @@ public class ClientEntity {
 
     @Column(name="SURROGATE_AUTH_REQUIRED")
     private boolean surrogateAuthRequired;
+
+    @Column(name="ROOT_URL")
+    private String rootUrl;
 
     @Column(name="BASE_URL")
     private String baseUrl;
@@ -138,6 +145,14 @@ public class ClientEntity {
         this.name = name;
     }
 
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -168,6 +183,14 @@ public class ClientEntity {
 
     public void setRedirectUris(Set<String> redirectUris) {
         this.redirectUris = redirectUris;
+    }
+
+    public String getClientAuthenticatorType() {
+        return clientAuthenticatorType;
+    }
+
+    public void setClientAuthenticatorType(String clientAuthenticatorType) {
+        this.clientAuthenticatorType = clientAuthenticatorType;
     }
 
     public String getSecret() {
@@ -248,6 +271,14 @@ public class ClientEntity {
 
     public void setSurrogateAuthRequired(boolean surrogateAuthRequired) {
         this.surrogateAuthRequired = surrogateAuthRequired;
+    }
+
+    public String getRootUrl() {
+        return rootUrl;
+    }
+
+    public void setRootUrl(String rootUrl) {
+        this.rootUrl = rootUrl;
     }
 
     public String getBaseUrl() {

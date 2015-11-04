@@ -49,7 +49,7 @@ public class MongoUserProvider implements UserProvider {
     }
 
     @Override
-    public UserModel getUserById(String id, RealmModel realm) {
+    public UserAdapter getUserById(String id, RealmModel realm) {
         MongoUserEntity user = getMongoStore().loadEntity(MongoUserEntity.class, id, invocationContext);
 
         // Check that it's user from this realm
@@ -231,13 +231,10 @@ public class MongoUserProvider implements UserProvider {
     }
 
     @Override
-    public List<UserModel> searchForUserByUserAttributes(Map<String, String> attributes, RealmModel realm) {
+    public List<UserModel> searchForUserByUserAttribute(String attrName, String attrValue, RealmModel realm) {
         QueryBuilder queryBuilder = new QueryBuilder()
                 .and("realmId").is(realm.getId());
-
-        for (Map.Entry<String, String> entry : attributes.entrySet()) {
-            queryBuilder.and("attributes." + entry.getKey()).is(entry.getValue());
-        }
+        queryBuilder.and("attributes." + attrName).is(attrValue);
 
         List<MongoUserEntity> users = getMongoStore().loadEntities(MongoUserEntity.class, queryBuilder.get(), invocationContext);
         return convertUserEntities(realm, users);
@@ -245,8 +242,8 @@ public class MongoUserProvider implements UserProvider {
 
     @Override
     public Set<FederatedIdentityModel> getFederatedIdentities(UserModel userModel, RealmModel realm) {
-        UserModel user = getUserById(userModel.getId(), realm);
-        MongoUserEntity userEntity = ((UserAdapter) user).getUser();
+        UserAdapter user = getUserById(userModel.getId(), realm);
+        MongoUserEntity userEntity = user.getUser();
         List<FederatedIdentityEntity> linkEntities = userEntity.getFederatedIdentities();
 
         if (linkEntities == null) {
@@ -264,8 +261,8 @@ public class MongoUserProvider implements UserProvider {
 
     @Override
     public FederatedIdentityModel getFederatedIdentity(UserModel user, String socialProvider, RealmModel realm) {
-        user = getUserById(user.getId(), realm);
-        MongoUserEntity userEntity = ((UserAdapter) user).getUser();
+        UserAdapter mongoUser = getUserById(user.getId(), realm);
+        MongoUserEntity userEntity = mongoUser.getUser();
         FederatedIdentityEntity federatedIdentityEntity = findFederatedIdentityLink(userEntity, socialProvider);
 
         return federatedIdentityEntity != null ? new FederatedIdentityModel(federatedIdentityEntity.getIdentityProvider(), federatedIdentityEntity.getUserId(),
@@ -321,8 +318,8 @@ public class MongoUserProvider implements UserProvider {
 
     @Override
     public void addFederatedIdentity(RealmModel realm, UserModel user, FederatedIdentityModel identity) {
-        user = getUserById(user.getId(), realm);
-        MongoUserEntity userEntity = ((UserAdapter) user).getUser();
+        UserAdapter mongoUser = getUserById(user.getId(), realm);
+        MongoUserEntity userEntity = mongoUser.getUser();
         FederatedIdentityEntity federatedIdentityEntity = new FederatedIdentityEntity();
         federatedIdentityEntity.setIdentityProvider(identity.getIdentityProvider());
         federatedIdentityEntity.setUserId(identity.getUserId());
@@ -334,8 +331,8 @@ public class MongoUserProvider implements UserProvider {
 
     @Override
     public void updateFederatedIdentity(RealmModel realm, UserModel federatedUser, FederatedIdentityModel federatedIdentityModel) {
-        federatedUser = getUserById(federatedUser.getId(), realm);
-        MongoUserEntity userEntity = ((UserAdapter) federatedUser).getUser();
+        UserAdapter mongoUser = getUserById(federatedUser.getId(), realm);
+        MongoUserEntity userEntity = mongoUser.getUser();
         FederatedIdentityEntity federatedIdentityEntity = findFederatedIdentityLink(userEntity, federatedIdentityModel.getIdentityProvider());
 
         federatedIdentityEntity.setToken(federatedIdentityModel.getToken());
@@ -343,8 +340,8 @@ public class MongoUserProvider implements UserProvider {
 
     @Override
     public boolean removeFederatedIdentity(RealmModel realm, UserModel userModel, String socialProvider) {
-        UserModel user = getUserById(userModel.getId(), realm);
-        MongoUserEntity userEntity = ((UserAdapter) user).getUser();
+        UserAdapter user = getUserById(userModel.getId(), realm);
+        MongoUserEntity userEntity = user.getUser();
         FederatedIdentityEntity federatedIdentityEntity = findFederatedIdentityLink(userEntity, socialProvider);
         if (federatedIdentityEntity == null) {
             return false;
@@ -369,6 +366,19 @@ public class MongoUserProvider implements UserProvider {
     @Override
     public UserModel addUser(RealmModel realm, String username) {
         return this.addUser(realm, null, username, true, true);
+    }
+
+    @Override
+    public void grantToAllUsers(RealmModel realm, RoleModel role) {
+        DBObject query = new QueryBuilder()
+                .and("realmId").is(realm.getId())
+                .get();
+
+        DBObject update = new QueryBuilder()
+                .and("$push").is(new BasicDBObject("roleIds", role.getId()))
+                .get();
+
+        int count = getMongoStore().updateEntities(MongoUserEntity.class, query, update, invocationContext);
     }
 
     @Override

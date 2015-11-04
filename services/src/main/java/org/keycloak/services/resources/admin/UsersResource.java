@@ -4,7 +4,7 @@ import org.jboss.logging.Logger;
 import org.jboss.resteasy.annotations.cache.NoCache;
 import org.jboss.resteasy.spi.BadRequestException;
 import org.jboss.resteasy.spi.NotFoundException;
-import org.keycloak.ClientConnection;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.authentication.RequiredActionProvider;
 import org.keycloak.email.EmailException;
 import org.keycloak.email.EmailProvider;
@@ -69,13 +69,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.keycloak.models.UsernameLoginFailureModel;
 import org.keycloak.services.managers.BruteForceProtector;
+import org.keycloak.services.managers.UserSessionManager;
 import org.keycloak.services.resources.AccountService;
+import org.keycloak.common.util.Time;
 
 /**
  * Base resource for managing users
@@ -118,7 +121,7 @@ public class UsersResource {
     /**
      * Update the user
      *
-     * @param id
+     * @param id User id
      * @param rep
      * @return
      */
@@ -164,7 +167,9 @@ public class UsersResource {
     }
 
     /**
-     * Create a new user.  Must be a unique username!
+     * Create a new user
+     *
+     * Username must be unique.
      *
      * @param uriInfo
      * @param rep
@@ -245,7 +250,7 @@ public class UsersResource {
     /**
      * Get represenation of the user
      *
-     * @param id user id
+     * @param id User id
      * @return
      */
     @Path("{id}")
@@ -274,6 +279,12 @@ public class UsersResource {
         return rep;
     }
 
+    /**
+     * Impersonate the user
+     *
+     * @param id User id
+     * @return
+     */
     @Path("{id}/impersonation")
     @POST
     @NoCache
@@ -314,9 +325,9 @@ public class UsersResource {
 
 
     /**
-     * List set of sessions associated with this user.
+     * Get sessions associated with the user
      *
-     * @param id
+     * @param id User id
      * @return
      */
     @Path("{id}/sessions")
@@ -339,9 +350,47 @@ public class UsersResource {
     }
 
     /**
-     * List set of social logins associated with this user.
+     * Get offline sessions associated with the user and client
      *
-     * @param id
+     * @param id User id
+     * @return
+     */
+    @Path("{id}/offline-sessions/{clientId}")
+    @GET
+    @NoCache
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<UserSessionRepresentation> getSessions(final @PathParam("id") String id, final @PathParam("clientId") String clientId) {
+        auth.requireView();
+        UserModel user = session.users().getUserById(id, realm);
+        if (user == null) {
+            throw new NotFoundException("User not found");
+        }
+        ClientModel client = realm.getClientById(clientId);
+        if (client == null) {
+            throw new NotFoundException("Client not found");
+        }
+        List<UserSessionModel> sessions = new UserSessionManager(session).findOfflineSessions(realm, client, user);
+        List<UserSessionRepresentation> reps = new ArrayList<UserSessionRepresentation>();
+        for (UserSessionModel session : sessions) {
+            UserSessionRepresentation rep = ModelToRepresentation.toRepresentation(session);
+
+            // Update lastSessionRefresh with the timestamp from clientSession
+            for (ClientSessionModel clientSession : session.getClientSessions()) {
+                if (clientId.equals(clientSession.getClient().getId())) {
+                    rep.setLastAccess(Time.toMillis(clientSession.getTimestamp()));
+                    break;
+                }
+            }
+
+            reps.add(rep);
+        }
+        return reps;
+    }
+
+    /**
+     * Get social logins associated with the user
+     *
+     * @param id User id
      * @return
      */
     @Path("{id}/federated-identity")
@@ -373,6 +422,14 @@ public class UsersResource {
         return result;
     }
 
+    /**
+     * Add a social login provider to the user
+     *
+     * @param id User id
+     * @param provider Social login provider id
+     * @param rep
+     * @return
+     */
     @Path("{id}/federated-identity/{provider}")
     @POST
     @NoCache
@@ -392,6 +449,12 @@ public class UsersResource {
         return Response.noContent().build();
     }
 
+    /**
+     * Remove a social login provider from user
+     *
+     * @param id User id
+     * @param provider Social login provider id
+     */
     @Path("{id}/federated-identity/{provider}")
     @DELETE
     @NoCache
@@ -408,37 +471,63 @@ public class UsersResource {
     }
 
     /**
-     * List set of consents granted by this user.
+     * Get consents granted by the user
      *
-     * @param id
+     * @param id User id
      * @return
      */
     @Path("{id}/consents")
     @GET
     @NoCache
     @Produces(MediaType.APPLICATION_JSON)
-    public List<UserConsentRepresentation> getConsents(final @PathParam("id") String id) {
+    public List<Map<String, Object>> getConsents(final @PathParam("id") String id) {
         auth.requireView();
         UserModel user = session.users().getUserById(id, realm);
         if (user == null) {
             throw new NotFoundException("User not found");
         }
 
-        List<UserConsentModel> consents = user.getConsents();
-        List<UserConsentRepresentation> result = new ArrayList<UserConsentRepresentation>();
+        List<Map<String, Object>> result = new LinkedList<>();
 
-        for (UserConsentModel consent : consents) {
-            UserConsentRepresentation rep = ModelToRepresentation.toRepresentation(consent);
-            result.add(rep);
+        Set<ClientModel> offlineClients = new UserSessionManager(session).findClientsWithOfflineToken(realm, user);
+
+        for (ClientModel client : realm.getClients()) {
+            UserConsentModel consent = user.getConsentByClient(client.getId());
+            boolean hasOfflineToken = offlineClients.contains(client);
+
+            if (consent == null && !hasOfflineToken) {
+                continue;
+            }
+
+            UserConsentRepresentation rep = (consent == null) ? null : ModelToRepresentation.toRepresentation(consent);
+
+            Map<String, Object> currentRep = new HashMap<>();
+            currentRep.put("clientId", client.getClientId());
+            currentRep.put("grantedProtocolMappers", (rep==null ? Collections.emptyMap() : rep.getGrantedProtocolMappers()));
+            currentRep.put("grantedRealmRoles", (rep==null ? Collections.emptyList() : rep.getGrantedRealmRoles()));
+            currentRep.put("grantedClientRoles", (rep==null ? Collections.emptyMap() : rep.getGrantedClientRoles()));
+
+            List<Map<String, String>> additionalGrants = new LinkedList<>();
+            if (hasOfflineToken) {
+                Map<String, String> offlineTokens = new HashMap<>();
+                offlineTokens.put("client", client.getId());
+                // TODO: translate
+                offlineTokens.put("key", "Offline Token");
+                additionalGrants.add(offlineTokens);
+            }
+            currentRep.put("additionalGrants", additionalGrants);
+
+            result.add(currentRep);
         }
+
         return result;
     }
 
     /**
-     * Revoke consent for particular client
+     * Revoke consent and offline tokens for particular client from user
      *
-     * @param id
-     * @param clientId
+     * @param id User id
+     * @param clientId Client id
      */
     @Path("{id}/consents/{client}")
     @DELETE
@@ -451,21 +540,26 @@ public class UsersResource {
         }
 
         ClientModel client = realm.getClientByClientId(clientId);
-        boolean revoked = user.revokeConsentForClient(client.getId());
-        if (revoked) {
+        boolean revokedConsent = user.revokeConsentForClient(client.getId());
+        boolean revokedOfflineToken = new UserSessionManager(session).revokeOfflineToken(user, client);
+
+        if (revokedConsent) {
             // Logout clientSessions for this user and client
             AuthenticationManager.backchannelUserFromClient(session, realm, user, client, uriInfo, headers);
-        } else {
-            throw new NotFoundException("Consent not found for user " + id + " and client " + clientId);
+        }
+
+        if (!revokedConsent && !revokedOfflineToken) {
+            throw new NotFoundException("Consent nor offline token not found");
         }
         adminEvent.operation(OperationType.ACTION).resourcePath(uriInfo).success();
     }
 
     /**
-     * Remove all user sessions associated with this user.  And, for all client that have an admin URL, tell
-     * them to invalidate the sessions for this particular user.
+     * Remove all user sessions associated with the user
      *
-     * @param id user id
+     * Also send notification to all clients that have an admin URL to invalidate the sessions for the particular user.
+     *
+     * @param id User id
      */
     @Path("{id}/logout")
     @POST
@@ -484,9 +578,9 @@ public class UsersResource {
     }
 
     /**
-     * delete this user
+     * Delete the user
      *
-     * @param id user id
+     * @param id User id
      */
     @Path("{id}")
     @DELETE
@@ -509,13 +603,17 @@ public class UsersResource {
     }
 
     /**
-     * Query list of users.  May pass in query criteria
+     * Get users
      *
-     * @param search string contained in username, first or last name, or email
+     * Returns a list of users, filtered according to query parameters
+     *
+     * @param search A String contained in username, first or last name, or email
      * @param last
      * @param first
      * @param email
      * @param username
+     * @param first Pagination offset
+     * @param maxResults Pagination size
      * @return
      */
     @GET
@@ -563,9 +661,9 @@ public class UsersResource {
     }
 
     /**
-     * Get role mappings for this user
+     * Get role mappings for the user
      *
-     * @param id user id
+     * @param id User id
      * @return
      */
     @Path("{id}/role-mappings")
@@ -614,9 +712,9 @@ public class UsersResource {
     }
 
     /**
-     * Get realm-level role mappings for this user
+     * Get realm-level role mappings for the user
      *
-     * @param id user id
+     * @param id User id
      * @return
      */
     @Path("{id}/role-mappings/realm")
@@ -640,9 +738,11 @@ public class UsersResource {
     }
 
     /**
-     * Effective realm-level role mappings for this user.  Will recurse all composite roles to get this list.
+     * Get effective realm-level role mappings for the user
      *
-     * @param id user id
+     * This will recurse all composite roles to get the result.
+     *
+     * @param id User id
      * @return
      */
     @Path("{id}/role-mappings/realm/composite")
@@ -668,9 +768,9 @@ public class UsersResource {
     }
 
     /**
-     * Realm-level roles that can be mapped to this user
+     * Get realm-level roles that can be mapped to this user
      *
-     * @param id
+     * @param id User id
      * @return
      */
     @Path("{id}/role-mappings/realm/available")
@@ -690,10 +790,10 @@ public class UsersResource {
     }
 
     /**
-     * Add realm-level role mappings
+     * Add realm-level role mappings to the user
      *
-     * @param id
-     * @param roles
+     * @param id User id
+     * @param roles Roles to add
      */
     @Path("{id}/role-mappings/realm")
     @POST
@@ -720,7 +820,7 @@ public class UsersResource {
     /**
      * Delete realm-level role mappings
      *
-     * @param id user id
+     * @param id User id
      * @param roles
      */
     @Path("{id}/role-mappings/realm")
@@ -763,19 +863,21 @@ public class UsersResource {
         }
 
         ClientModel clientModel = realm.getClientById(client);
-        if (client == null) {
+        if (clientModel == null) {
             throw new NotFoundException("Client not found");
         }
 
         return new UserClientRoleMappingsResource(uriInfo, realm, auth, user, clientModel, adminEvent);
 
     }
+
     /**
-     *  Set up a temporary password for this user.  User will have to reset this temporary password when they log
-     *  in next.
+     * Set up a temporary password for the user
      *
-     * @param id
-     * @param pass temporary password
+     * User will have to reset the temporary password next time they log in.
+     *
+     * @param id User id
+     * @param pass A Temporary password
      */
     @Path("{id}/reset-password")
     @PUT
@@ -805,9 +907,9 @@ public class UsersResource {
     }
 
     /**
+     * Remove TOTP from the user
      *
-     *
-     * @param id
+     * @param id User id
      */
     @Path("{id}/remove-totp")
     @PUT
@@ -829,9 +931,38 @@ public class UsersResource {
      * The redirectUri and clientId parameters are optional. The default for the
      * redirect is the account client.
      *
+     * This endpoint has been deprecated.  Please use the execute-actions-email passing a list with
+     * UPDATE_PASSWORD within it.
+     *
      * @param id
      * @param redirectUri redirect uri
      * @param clientId client id
+     * @return
+     */
+    @Deprecated
+    @Path("{id}/reset-password-email")
+    @PUT
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response resetPasswordEmail(@PathParam("id") String id,
+                                        @QueryParam(OIDCLoginProtocol.REDIRECT_URI_PARAM) String redirectUri,
+                                        @QueryParam(OIDCLoginProtocol.CLIENT_ID_PARAM) String clientId) {
+        List<String> actions = new LinkedList<>();
+        actions.add(UserModel.RequiredAction.UPDATE_PASSWORD.name());
+        return executeActionsEmail(id, redirectUri, clientId, actions);
+    }
+
+
+    /**
+     * Send a update account email to the user
+     *
+     * An email contains a link the user can click to perform a set of required actions.
+     * The redirectUri and clientId parameters are optional. The default for the
+     * redirect is the account client.
+     *
+     * @param id User is
+     * @param redirectUri Redirect uri
+     * @param clientId Client id
+     * @param actions required actions the user needs to complete
      * @return
      */
     @Path("{id}/execute-actions-email")
@@ -880,13 +1011,15 @@ public class UsersResource {
     }
 
     /**
-     * Send an email to the user with a link they can click to verify their email address.
+     * Send an email-verification email to the user
+     *
+     * An email contains a link the user can click to verify their email address.
      * The redirectUri and clientId parameters are optional. The default for the
      * redirect is the account client.
      *
-     * @param id
-     * @param redirectUri redirect uri
-     * @param clientId client id
+     * @param id User id
+     * @param redirectUri Redirect uri
+     * @param clientId Client id
      * @return
      */
     @Path("{id}/send-verify-email")

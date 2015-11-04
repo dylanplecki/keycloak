@@ -24,7 +24,6 @@ package org.keycloak.testsuite;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -35,16 +34,15 @@ import org.json.JSONObject;
 import org.junit.Assert;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.RSATokenVerifier;
-import org.keycloak.VerificationException;
+import org.keycloak.common.VerificationException;
 import org.keycloak.constants.AdapterConstants;
-import org.keycloak.freemarker.LocaleHelper;
 import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.jose.jws.crypto.RSAProvider;
 import org.keycloak.protocol.oidc.OIDCLoginProtocolService;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.RefreshToken;
 import org.keycloak.util.BasicAuthHelper;
-import org.keycloak.util.PemUtils;
+import org.keycloak.common.util.PemUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 
@@ -75,6 +73,8 @@ public class OAuthClient {
     private String redirectUri = "http://localhost:8081/app/auth";
 
     private String state = "mystate";
+
+    private String scope;
 
     private String uiLocales = null;
 
@@ -192,6 +192,9 @@ public class OAuthClient {
             if (clientSessionHost != null) {
                 parameters.add(new BasicNameValuePair(AdapterConstants.CLIENT_SESSION_HOST, clientSessionHost));
             }
+            if (scope != null) {
+                parameters.add(new BasicNameValuePair(OAuth2Constants.SCOPE, scope));
+            }
 
             UrlEncodedFormEntity formEntity;
             try {
@@ -217,6 +220,10 @@ public class OAuthClient {
 
             List<NameValuePair> parameters = new LinkedList<NameValuePair>();
             parameters.add(new BasicNameValuePair(OAuth2Constants.GRANT_TYPE, OAuth2Constants.CLIENT_CREDENTIALS));
+
+            if (scope != null) {
+                parameters.add(new BasicNameValuePair(OAuth2Constants.SCOPE, scope));
+            }
 
             UrlEncodedFormEntity formEntity;
             try {
@@ -388,7 +395,10 @@ public class OAuthClient {
             b.queryParam(OAuth2Constants.STATE, state);
         }
         if(uiLocales != null){
-            b.queryParam(LocaleHelper.UI_LOCALES_PARAM, uiLocales);
+            b.queryParam(OAuth2Constants.UI_LOCALES_PARAM, uiLocales);
+        }
+        if (scope != null) {
+            b.queryParam(OAuth2Constants.SCOPE, scope);
         }
         return b.build(realm).toString();
     }
@@ -449,6 +459,11 @@ public class OAuthClient {
 
     public OAuthClient state(String state) {
         this.state = state;
+        return this;
+    }
+
+    public OAuthClient scope(String scope) {
+        this.scope = scope;
         return this;
     }
 

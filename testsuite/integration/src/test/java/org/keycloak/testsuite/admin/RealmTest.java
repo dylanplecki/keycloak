@@ -1,15 +1,22 @@
 package org.keycloak.testsuite.admin;
 
+import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.services.managers.RealmManager;
+import org.keycloak.util.JsonSerialization;
 
 import javax.ws.rs.NotFoundException;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -98,6 +105,31 @@ public class RealmTest extends AbstractClientTest {
     }
 
     @Test
+    public void updateRealmWithNewRepresentation() {
+        // first change
+        RealmRepresentation rep = new RealmRepresentation();
+        rep.setEditUsernameAllowed(true);
+        rep.setSupportedLocales(new HashSet<>(Arrays.asList("en", "de")));
+
+        realm.update(rep);
+
+        rep = realm.toRepresentation();
+
+        assertEquals(Boolean.TRUE, rep.isEditUsernameAllowed());
+        assertEquals(2, rep.getSupportedLocales().size());
+
+        // second change
+        rep = new RealmRepresentation();
+        rep.setEditUsernameAllowed(false);
+
+        realm.update(rep);
+
+        rep = realm.toRepresentation();
+        assertEquals(Boolean.FALSE, rep.isEditUsernameAllowed());
+        assertEquals(2, rep.getSupportedLocales().size());
+    }
+
+    @Test
     public void getRealmRepresentation() {
         RealmRepresentation rep = realm.toRepresentation();
         assertEquals(REALM_NAME, rep.getRealm());
@@ -112,7 +144,7 @@ public class RealmTest extends AbstractClientTest {
     @Test
     // KEYCLOAK-1110
     public void deleteDefaultRole() {
-        RoleRepresentation role = new RoleRepresentation("test", "test");
+        RoleRepresentation role = new RoleRepresentation("test", "test", false);
         realm.roles().create(role);
 
         assertNotNull(realm.roles().get("test").toRepresentation());
@@ -130,6 +162,37 @@ public class RealmTest extends AbstractClientTest {
             fail("Expected NotFoundException");
         } catch (NotFoundException e) {
         }
+    }
+
+    @Test
+    public void convertKeycloakClientDescription() throws IOException {
+        ClientRepresentation description = new ClientRepresentation();
+        description.setClientId("client-id");
+        description.setRedirectUris(Collections.singletonList("http://localhost"));
+
+        ClientRepresentation converted = realm.convertClientDescription(JsonSerialization.writeValueAsString(description));
+        assertEquals("client-id", converted.getClientId());
+        assertEquals("http://localhost", converted.getRedirectUris().get(0));
+    }
+
+    @Test
+    public void convertOIDCClientDescription() throws IOException {
+        String description = IOUtils.toString(getClass().getResourceAsStream("/client-descriptions/client-oidc.json"));
+
+        ClientRepresentation converted = realm.convertClientDescription(description);
+        assertEquals(36, converted.getClientId().length());
+        assertEquals(1, converted.getRedirectUris().size());
+        assertEquals("http://localhost", converted.getRedirectUris().get(0));
+    }
+
+    @Test
+    public void convertSAMLClientDescription() throws IOException {
+        String description = IOUtils.toString(getClass().getResourceAsStream("/client-descriptions/saml-entity-descriptor.xml"));
+
+        ClientRepresentation converted = realm.convertClientDescription(description);
+        assertEquals("loadbalancer-9.siroe.com", converted.getClientId());
+        assertEquals(1, converted.getRedirectUris().size());
+        assertEquals("https://LoadBalancer-9.siroe.com:3443/federation/Consumer/metaAlias/sp", converted.getRedirectUris().get(0));
     }
 
 }

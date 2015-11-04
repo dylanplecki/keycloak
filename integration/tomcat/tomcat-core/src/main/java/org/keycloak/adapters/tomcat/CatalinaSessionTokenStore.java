@@ -5,12 +5,11 @@ import org.apache.catalina.connector.Request;
 import org.apache.catalina.realm.GenericPrincipal;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.AdapterTokenStore;
-import org.keycloak.adapters.KeycloakAccount;
 import org.keycloak.adapters.KeycloakDeployment;
+import org.keycloak.adapters.OidcKeycloakAccount;
 import org.keycloak.adapters.RefreshableKeycloakSecurityContext;
 import org.keycloak.adapters.RequestAuthenticator;
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.security.Principal;
 import java.util.Set;
@@ -19,26 +18,23 @@ import java.util.logging.Logger;
 /**
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
  */
-public class CatalinaSessionTokenStore implements AdapterTokenStore {
+public class CatalinaSessionTokenStore extends CatalinaAdapterSessionStore implements AdapterTokenStore {
 
     private static final Logger log = Logger.getLogger("" + CatalinaSessionTokenStore.class);
 
-    private Request request;
     private KeycloakDeployment deployment;
     private CatalinaUserSessionManagement sessionManagement;
     protected GenericPrincipalFactory principalFactory;
-    protected AbstractKeycloakAuthenticatorValve valve;
 
 
     public CatalinaSessionTokenStore(Request request, KeycloakDeployment deployment,
                                      CatalinaUserSessionManagement sessionManagement,
                                      GenericPrincipalFactory principalFactory,
                                      AbstractKeycloakAuthenticatorValve valve) {
-        this.request = request;
+        super(request, valve);
         this.deployment = deployment;
         this.sessionManagement = sessionManagement;
         this.principalFactory = principalFactory;
-        this.valve = valve;
     }
 
     @Override
@@ -72,7 +68,7 @@ public class CatalinaSessionTokenStore implements AdapterTokenStore {
     }
 
     protected void cleanSession(Session catalinaSession) {
-        catalinaSession.getSession().removeAttribute(KeycloakAccount.class.getName());
+        catalinaSession.getSession().removeAttribute(OidcKeycloakAccount.class.getName());
         catalinaSession.setPrincipal(null);
         catalinaSession.setAuthType(null);
     }
@@ -101,7 +97,7 @@ public class CatalinaSessionTokenStore implements AdapterTokenStore {
         GenericPrincipal principal = (GenericPrincipal) session.getPrincipal();
         // in clustered environment in JBossWeb, principal is not serialized or saved
         if (principal == null) {
-            principal = principalFactory.createPrincipal(request.getContext().getRealm(), account.getPrincipal(), account.getRoles(), securityContext);
+            principal = principalFactory.createPrincipal(request.getContext().getRealm(), account.getPrincipal(), account.getRoles());
             session.setPrincipal(principal);
             session.setAuthType("KEYCLOAK");
 
@@ -113,7 +109,7 @@ public class CatalinaSessionTokenStore implements AdapterTokenStore {
         return true;
     }
 
-    public static class SerializableKeycloakAccount implements KeycloakAccount, Serializable {
+    public static class SerializableKeycloakAccount implements OidcKeycloakAccount, Serializable {
         protected Set<String> roles;
         protected Principal principal;
         protected RefreshableKeycloakSecurityContext securityContext;
@@ -141,10 +137,10 @@ public class CatalinaSessionTokenStore implements AdapterTokenStore {
     }
 
     @Override
-    public void saveAccountInfo(KeycloakAccount account) {
+    public void saveAccountInfo(OidcKeycloakAccount account) {
         RefreshableKeycloakSecurityContext securityContext = (RefreshableKeycloakSecurityContext) account.getKeycloakSecurityContext();
         Set<String> roles = account.getRoles();
-        GenericPrincipal principal = principalFactory.createPrincipal(request.getContext().getRealm(), account.getPrincipal(), roles, securityContext);
+        GenericPrincipal principal = principalFactory.createPrincipal(request.getContext().getRealm(), account.getPrincipal(), roles);
 
         SerializableKeycloakAccount sAccount = new SerializableKeycloakAccount(roles, account.getPrincipal(), securityContext);
         Session session = request.getSessionInternal(true);
@@ -169,17 +165,4 @@ public class CatalinaSessionTokenStore implements AdapterTokenStore {
         // no-op
     }
 
-    @Override
-    public void saveRequest() {
-        try {
-            valve.keycloakSaveRequest(request);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public boolean restoreRequest() {
-        return valve.keycloakRestoreRequest(request);
-    }
 }

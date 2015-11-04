@@ -7,11 +7,9 @@ import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 import org.junit.runners.MethodSorters;
-import org.keycloak.federation.ldap.LDAPConfig;
 import org.keycloak.federation.ldap.LDAPFederationProvider;
 import org.keycloak.federation.ldap.LDAPFederationProviderFactory;
 import org.keycloak.federation.ldap.idm.model.LDAPObject;
-import org.keycloak.federation.ldap.mappers.UserAttributeLDAPFederationMapper;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.LDAPConstants;
@@ -25,12 +23,11 @@ import org.keycloak.models.UserProvider;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.services.managers.RealmManager;
 import org.keycloak.services.managers.UsersSyncManager;
-import org.keycloak.testsuite.rule.AbstractKeycloakRule;
 import org.keycloak.testsuite.rule.KeycloakRule;
 import org.keycloak.testsuite.rule.LDAPRule;
 import org.keycloak.testsuite.DummyUserFederationProviderFactory;
 import org.keycloak.timer.TimerProvider;
-import org.keycloak.util.Time;
+import org.keycloak.common.util.Time;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -56,7 +53,6 @@ public class SyncProvidersTest {
             Map<String,String> ldapConfig = ldapRule.getConfig();
             ldapConfig.put(LDAPConstants.SYNC_REGISTRATIONS, "false");
             ldapConfig.put(LDAPConstants.EDIT_MODE, UserFederationProvider.EditMode.WRITABLE.toString());
-
             ldapModel = appRealm.addUserFederationProvider(LDAPFederationProviderFactory.PROVIDER_NAME, ldapConfig, 0, "test-ldap",
                     -1, -1, 0);
 
@@ -91,7 +87,7 @@ public class SyncProvidersTest {
         UsersSyncManager usersSyncManager = new UsersSyncManager();
 
         // wait a bit
-        sleep(1000);
+        sleep(ldapRule.getSleepTime());
 
         KeycloakSession session = keycloakRule.startSession();
         try {
@@ -125,7 +121,7 @@ public class SyncProvidersTest {
             }
 
             // wait a bit
-            sleep(1000);
+            sleep(ldapRule.getSleepTime());
 
             // Add user to LDAP and update 'user5' in LDAP
             LDAPFederationProvider ldapFedProvider = FederationTestUtils.getLdapProvider(session, ldapModel);
@@ -391,9 +387,9 @@ public class SyncProvidersTest {
     }
 
     private void assertSyncEquals(UserFederationSyncResult syncResult, int expectedAdded, int expectedUpdated, int expectedRemoved, int expectedFailed) {
-        Assert.assertEquals(syncResult.getAdded(), expectedAdded);
-        Assert.assertEquals(syncResult.getUpdated(), expectedUpdated);
-        Assert.assertEquals(syncResult.getRemoved(), expectedRemoved);
-        Assert.assertEquals(syncResult.getFailed(), expectedFailed);
+        Assert.assertEquals(expectedAdded, syncResult.getAdded());
+        Assert.assertEquals(expectedUpdated, syncResult.getUpdated());
+        Assert.assertEquals(expectedRemoved, syncResult.getRemoved());
+        Assert.assertEquals(expectedFailed, syncResult.getFailed());
     }
 }

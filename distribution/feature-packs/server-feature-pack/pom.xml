@@ -20,7 +20,7 @@
     <parent>
         <groupId>org.keycloak</groupId>
         <artifactId>feature-packs-parent</artifactId>
-        <version>1.5.0.Final-SNAPSHOT</version>
+        <version>1.7.0.Final-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -29,11 +29,6 @@
 
     <name>Keycloak Feature Pack: Server</name>
     <packaging>pom</packaging>
-
-    <properties>
-        <product.name>Keycloak</product.name>
-        <product.version>${project.version}</product.version>
-    </properties>
 
     <dependencies>
         <dependency>

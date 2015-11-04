@@ -10,6 +10,7 @@ import org.keycloak.models.sessions.infinispan.compat.entities.UserSessionEntity
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
@@ -36,6 +37,11 @@ public class UserSessionAdapter implements UserSessionModel {
 
     public String getId() {
         return entity.getId();
+    }
+
+    @Override
+    public RealmModel getRealm() {
+        return realm;
     }
 
     @Override
@@ -144,5 +150,8 @@ public class UserSessionAdapter implements UserSessionModel {
 
     }
 
-
+    @Override
+    public Map<String, String> getNotes() {
+        return entity.getNotes();
+    }
 }

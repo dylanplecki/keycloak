@@ -4,12 +4,10 @@ import org.jboss.logging.Logger;
 import org.jboss.resteasy.annotations.cache.NoCache;
 import org.jboss.resteasy.spi.NotFoundException;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
-import org.keycloak.constants.KerberosConstants;
+import org.keycloak.common.constants.KerberosConstants;
 import org.keycloak.events.admin.OperationType;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
-import org.keycloak.models.RequiredCredentialModel;
-import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserFederationProvider;
 import org.keycloak.models.UserFederationProviderFactory;
 import org.keycloak.models.UserFederationProviderModel;
@@ -84,7 +82,9 @@ public class UserFederationProvidersResource {
     }
 
     /**
-     * Get List of available provider factories
+     * Get available provider factories
+     *
+     * Returns a list of available provider factories.
      *
      * @return
      */
@@ -105,7 +105,7 @@ public class UserFederationProvidersResource {
     }
 
     /**
-     * Get factory with given ID
+     * Get factory with given id
      *
      * @return
      */
@@ -159,7 +159,7 @@ public class UserFederationProvidersResource {
     }
 
     /**
-     * list configured providers
+     * Get configured providers
      *
      * @return
      */
@@ -183,7 +183,7 @@ public class UserFederationProvidersResource {
 
         UserFederationProviderModel model = KeycloakModelUtils.findUserFederationProviderById(id, realm);
         if (model == null) {
-            throw new NotFoundException("Could not find federation provider with id: " + id);
+            throw new NotFoundException("Could not find federation provider");
         }
 
         UserFederationProviderResource instanceResource = new UserFederationProviderResource(session, realm, this.auth, model, adminEvent);

@@ -71,7 +71,7 @@ public class RoleByIdResource extends RoleResource {
     protected RoleModel getRoleModel(String id) {
         RoleModel roleModel = realm.getRoleById(id);
         if (roleModel == null) {
-            throw new NotFoundException("Could not find role with id: " + id);
+            throw new NotFoundException("Could not find role with id");
         }
 
         RealmAuth.Resource r = null;
@@ -87,7 +87,7 @@ public class RoleByIdResource extends RoleResource {
     }
 
     /**
-     * Delete this role
+     * Delete the role
      *
      * @param id id of role
      */
@@ -102,7 +102,7 @@ public class RoleByIdResource extends RoleResource {
     }
 
     /**
-     * Update this role
+     * Update the role
      *
      * @param id id of role
      * @param rep
@@ -118,7 +118,7 @@ public class RoleByIdResource extends RoleResource {
     }
 
     /**
-     * Make this role a composite role by associating some child roles to it.
+     * Make the role a composite role by associating some child roles
      *
      * @param id
      * @param roles
@@ -133,7 +133,9 @@ public class RoleByIdResource extends RoleResource {
     }
 
     /**
-     * If this role is a composite, return a set of its children
+     * Get role's children
+     *
+     * Returns a set of role's children provided the role is a composite.
      *
      * @param id
      * @return
@@ -151,7 +153,7 @@ public class RoleByIdResource extends RoleResource {
     }
 
     /**
-     * Return a set of realm-level roles that are in the role's composite
+     * Get realm-level roles that are in the role's composite
      *
      * @param id
      * @return
@@ -167,7 +169,7 @@ public class RoleByIdResource extends RoleResource {
     }
 
     /**
-     * Return a set of client-level roles for a specific client that are in the role's composite
+     * Get client-level roles for the client that are in the role's composite
      *
      * @param id
      * @param client
@@ -183,13 +185,13 @@ public class RoleByIdResource extends RoleResource {
         auth.requireView();
         ClientModel clientModel = realm.getClientById(client);
         if (clientModel == null) {
-            throw new NotFoundException("Could not find client: " + client);
+            throw new NotFoundException("Could not find client");
         }
         return getClientRoleComposites(clientModel, role);
     }
 
     /**
-     * Return a set of client-level roles for a specific client that are in the role's composite
+     * Get client-level roles for the client that are in the role's composite
      *
      * @param role
      * @param client
@@ -205,17 +207,17 @@ public class RoleByIdResource extends RoleResource {
         auth.requireView();
         ClientModel clientModel = realm.getClientById(client);
         if (clientModel == null) {
-            throw new NotFoundException("Could not find client: " + client);
+            throw new NotFoundException("Could not find client");
 
         }
         return getClientRoleComposites(clientModel, roleModel);
     }
 
     /**
-     * Remove the listed set of roles from this role's composite
+     * Remove a set of roles from the role's composite
      *
-     * @param id
-     * @param roles
+     * @param id Role id
+     * @param roles A set of roles to be removed
      */
     @Path("{role-id}/composites")
     @DELETE
